@@ -1,0 +1,15 @@
+next-version: 0.1.0
+branches:
+  main:
+    tag: ""
+  develop:
+    mode: ContinuousDeployment
+    tag: alpha
+  release:
+    mode: semver-from-branch
+    tag: beta
+  feature:
+    tag: use-branch-name
+  hotfix:
+    mode: semver-from-branch
+    tag: beta
