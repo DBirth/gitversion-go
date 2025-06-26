@@ -29,7 +29,7 @@ func newTestRepo(t *testing.T) *testRepo {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		os.RemoveAll(tempDir)
+		require.NoError(t, os.RemoveAll(tempDir))
 	})
 
 	return &testRepo{Repository: r, worktree: w, path: tempDir, t: t}

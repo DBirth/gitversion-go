@@ -1,3 +1,4 @@
+// The main package for the gitversion-go command-line tool.
 package main
 
 import (
@@ -10,9 +11,10 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+
 	"gitversion-go/internal/gitversion"
 	"gitversion-go/internal/pkg/fs"
-	"gopkg.in/yaml.v3"
 )
 
 var outputFormat string
@@ -29,7 +31,7 @@ var gitPlainOpen = git.PlainOpen
 var calculateCmd = &cobra.Command{
 	Use:   "calculate",
 	Short: "Calculates the next version from the Git repository",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fileSystem := fs.NewOsFs()
 		if err := runCalculate(fileSystem, os.Stdout, targetPath, outputFormat); err != nil {
 			log.Fatal(err)
@@ -68,8 +70,8 @@ func runCalculate(fs fs.Filesystem, out io.Writer, path, outputFormat string) er
 	}
 
 	if latestVersion == nil {
-		fmt.Fprintln(out, "No semantic version tags found.")
-		return nil
+		_, err := fmt.Fprintln(out, "No semantic version tags found.")
+		return err
 	}
 
 	nextVersion, commitsSinceTag, err := gitversion.CalculateNextVersion(r, latestVersion, latestTagCommit, &config)
@@ -86,10 +88,16 @@ func runCalculate(fs fs.Filesystem, out io.Writer, path, outputFormat string) er
 		if err != nil {
 			return fmt.Errorf("failed to generate JSON output: %w", err)
 		}
-		fmt.Fprintln(out, string(jsonOutput))
+		if _, err := fmt.Fprintln(out, string(jsonOutput)); err != nil {
+			return err
+		}
 	default:
-		fmt.Fprintf(out, "Latest version found: %s\n", latestVersion.String())
-		fmt.Fprintf(out, "Calculated next version: %s\n", vars.FullSemVer)
+		if _, err := fmt.Fprintf(out, "Latest version found: %s\n", latestVersion.String()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(out, "Calculated next version: %s\n", vars.FullSemVer); err != nil {
+			return err
+		}
 	}
 	return nil
 }
