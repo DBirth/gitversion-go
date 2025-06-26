@@ -1,3 +1,4 @@
+// Package gitversion provides the core logic for calculating the next semantic version.
 package gitversion
 
 import (
@@ -136,7 +137,7 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 				bump = patchBump
 			}
 		}
-		highestBump = max(highestBump, bump)
+		highestBump = maxSemverBump(highestBump, bump)
 		return nil
 	})
 
@@ -169,12 +170,12 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 	}
 
 	// Handle regular versioning
-	nextVersion := *latestVersion
 	bumpToApply := highestBump
 	if commitsSinceTag > 0 && bumpToApply == noBump && (branchConfig == nil || branchConfig.Mode != "semver-from-branch") {
 		bumpToApply = patchBump // Default to patch if there are commits but no bump messages
 	}
 
+	var nextVersion semver.Version
 	if bumpToApply == majorBump {
 		nextVersion = latestVersion.IncMajor()
 	} else if bumpToApply == minorBump {
@@ -213,14 +214,13 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 	return &nextVersion, commitsSinceTag, nil
 }
 
-// max returns the larger of two semverBumps.
 // Sanitize prepares a branch name for use in a pre-release tag.
 func Sanitize(branchName string) string {
 	return strings.ReplaceAll(branchName, "/", "-")
 }
 
-// max returns the larger of two semverBumps.
-func max(a, b semverBump) semverBump {
+// maxSemverBump returns the larger of two semverBumps.
+func maxSemverBump(a, b semverBump) semverBump {
 	if a > b {
 		return a
 	}

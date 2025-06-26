@@ -16,7 +16,7 @@ func init() {
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Creates a default GitVersion.yml file",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		fs := fs.NewOsFs()
 		return runInit(fs)
 	},

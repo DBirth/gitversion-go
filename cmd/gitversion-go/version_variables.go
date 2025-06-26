@@ -20,9 +20,7 @@ type VersionVariables struct {
 
 func buildVersionVariables(version semver.Version, branchName string, commitsSinceTag int, config *gitversion.Config) VersionVariables {
 	finalVersion := version
-	var matchingBranchConfig *gitversion.BranchConfig
-
-	matchingBranchConfig = config.GetBranchConfig(branchName)
+	matchingBranchConfig := config.GetBranchConfig(branchName)
 
 	if matchingBranchConfig != nil && commitsSinceTag > 0 {
 		tag := matchingBranchConfig.Tag

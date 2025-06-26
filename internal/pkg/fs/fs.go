@@ -1,3 +1,4 @@
+// Package fs provides an abstraction for filesystem operations.
 package fs
 
 import (
@@ -69,22 +70,30 @@ func (b *BillyWrappedFs) Exists(name string) (bool, error) {
 }
 
 // ReadFile reads the file named by filename and returns the contents.
-func (b *BillyWrappedFs) ReadFile(name string) ([]byte, error) {
+func (b *BillyWrappedFs) ReadFile(name string) (p []byte, err error) {
 	file, err := b.fs.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 	return io.ReadAll(file)
 }
 
 // WriteFile writes data to a file named by filename.
-func (b *BillyWrappedFs) WriteFile(name string, data []byte, perm fs.FileMode) error {
+func (b *BillyWrappedFs) WriteFile(name string, data []byte, perm fs.FileMode) (err error) {
 	file, err := b.fs.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 	_, err = file.Write(data)
 	return err
 }

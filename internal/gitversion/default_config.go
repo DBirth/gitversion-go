@@ -1,5 +1,6 @@
 package gitversion
 
+// DefaultConfig is the default configuration for GitVersion.
 const DefaultConfig = `next-version: 0.1.0
 major-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(breaking|major))"
 minor-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(feature|minor))"

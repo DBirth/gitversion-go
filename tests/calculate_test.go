@@ -1,3 +1,4 @@
+// Package tests contains integration tests for the GitVersion CLI.
 package tests
 
 import (

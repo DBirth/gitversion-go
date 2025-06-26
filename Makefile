@@ -16,7 +16,7 @@ build-linux:
 
 test:
 	@echo "Running tests..."
-	@$(GO_CMD) test ./...
+	@/bin/zsh -c 'source ~/.zshrc && $(GO_CMD) test ./...'
 
 clean:
 	@echo "Cleaning..."

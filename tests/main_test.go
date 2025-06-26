@@ -21,7 +21,11 @@ func TestMain(m *testing.M) {
 		fmt.Printf("Failed to create temp dir for binary: %v\n", err)
 		os.Exit(1)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			fmt.Printf("Failed to remove temp dir for binary: %v\n", err)
+		}
+	}()
 
 	binaryPath = filepath.Join(tempDir, "gitversion-go")
 	if runtime.GOOS == "windows" {
