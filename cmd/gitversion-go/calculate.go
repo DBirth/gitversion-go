@@ -8,10 +8,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitversion-go/internal/gitversion"
-	"gitversion-go/internal/pkg/fs"
 	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
+	"gitversion-go/internal/gitversion"
+	"gitversion-go/internal/pkg/fs"
 	"gopkg.in/yaml.v3"
 )
 
