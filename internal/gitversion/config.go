@@ -11,6 +11,7 @@ type Config struct {
 	NoBumpMessage           string                  `yaml:"no-bump-message"`
 	TagPrefix               string                  `yaml:"tag-prefix"`
 	Ignore                  []string                `yaml:"ignore,omitempty"`
+	Increment               string                  `yaml:"increment,omitempty"`
 	Branches                map[string]BranchConfig `yaml:"branches"`
 }
 
@@ -18,6 +19,7 @@ type Config struct {
 type BranchConfig struct {
 	Mode            string `yaml:"mode"`
 	Tag             string `yaml:"tag"`
+	Increment       string `yaml:"increment,omitempty"`
 	IsReleaseBranch *bool  `yaml:"is-release-branch,omitempty"`
 }
 

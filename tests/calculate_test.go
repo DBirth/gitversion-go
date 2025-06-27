@@ -133,6 +133,92 @@ func TestIgnoreSha(t *testing.T) {
 	assert.Contains(t, string(output), "1.0.0")
 }
 
+func TestIncrementSetting(t *testing.T) {
+	t.Run("BranchIncrementMinor", func(t *testing.T) {
+		repo := newTestRepo(t)
+		repo.writeFile("README.md", "initial commit")
+		initialCommit := repo.commit("initial commit")
+		repo.tag("v1.0.0", initialCommit)
+
+		repo.checkout("feature/new-stuff")
+		repo.writeFile("GitVersion.yml", `
+branches:
+  feature/*:
+    increment: Minor
+`)
+		repo.writeFile("feature-file.txt", "new feature on a branch")
+		repo.commit("chore: new feature on a branch")
+
+		cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(output))
+
+		assert.Contains(t, string(output), "1.1.0")
+	})
+
+	t.Run("BranchIncrementInherit", func(t *testing.T) {
+		repo := newTestRepo(t)
+		repo.writeFile("README.md", "initial commit")
+		initialCommit := repo.commit("initial commit")
+		repo.tag("v1.0.0", initialCommit)
+
+		repo.checkout("feature/new-stuff")
+		repo.writeFile("GitVersion.yml", `
+branches:
+  feature/*:
+    increment: Inherit
+`)
+		repo.writeFile("feature-file.txt", "new feature on a branch")
+		repo.commit("fix: a bug")
+
+		cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(output))
+
+		assert.Contains(t, string(output), "1.0.1")
+	})
+
+	t.Run("GlobalIncrementMajor", func(t *testing.T) {
+		repo := newTestRepo(t)
+		repo.writeFile("README.md", "initial commit")
+		initialCommit := repo.commit("initial commit")
+		repo.tag("v1.0.0", initialCommit)
+
+		repo.writeFile("GitVersion.yml", `increment: Major`)
+		repo.writeFile("another-file.txt", "another commit")
+		repo.commit("chore: another commit")
+
+		cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(output))
+
+		assert.Contains(t, string(output), "2.0.0")
+	})
+
+	t.Run("BranchIncrementOverridesGlobal", func(t *testing.T) {
+		repo := newTestRepo(t)
+		repo.writeFile("README.md", "initial commit")
+		initialCommit := repo.commit("initial commit")
+		repo.tag("v1.0.0", initialCommit)
+
+		repo.checkout("feature/new-stuff")
+		repo.writeFile("GitVersion.yml", `
+increment: Major
+branches:
+  feature/*:
+    increment: Patch
+`)
+		repo.writeFile("feature-file.txt", "new feature on a branch")
+		repo.commit("chore: new feature on a branch")
+
+		cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(output))
+
+		assert.Contains(t, string(output), "1.0.1")
+	})
+}
+
 func TestFeatureBranch_MultipleCommits(t *testing.T) {
 	repo := newTestRepo(t)
 	repo.writeFile("README.md", "initial commit")
