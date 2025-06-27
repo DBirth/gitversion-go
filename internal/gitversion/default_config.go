@@ -5,6 +5,7 @@ const DefaultConfig = `next-version: 0.1.0
 major-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(breaking|major))"
 minor-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(feature|minor))"
 patch-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(fix|patch))"
+no-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(none|skip))"
 tag-prefix: '[vV]'
 branches:
   main:

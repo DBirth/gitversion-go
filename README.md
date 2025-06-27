@@ -87,6 +87,8 @@ branches:
 -   `major-version-bump-message`: A regex pattern to identify commits that should trigger a major version bump.
 -   `minor-version-bump-message`: A regex pattern to identify commits that should trigger a minor version bump.
 -   `patch-version-bump-message`: A regex pattern to identify commits that should trigger a patch version bump.
+-   `no-bump-message`: A regex pattern to identify commits that should not trigger a version bump. If a commit message matches this pattern, it will be ignored.
+-   `tag-prefix`: A regex pattern to identify and strip a prefix from version tags. This is useful if your tags are not clean semantic versions (e.g., `release-1.2.3`).
 -   `branches`: A map of branch configurations. The keys are regex patterns to match against branch names.
     -   `mode`: (Optional) The versioning mode for the branch. `ContinuousDeployment` is a common mode for development branches.
     -   `tag`: The prerelease tag to use for the branch. If set to `use-branch-name`, the branch name will be sanitized and used as the prerelease tag (e.g., `feature/new-stuff` becomes `feature-new-stuff`).

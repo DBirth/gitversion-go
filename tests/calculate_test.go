@@ -99,6 +99,22 @@ func TestTagPrefix(t *testing.T) {
 	assert.Contains(t, string(output), "1.0.1")
 }
 
+func TestNoBumpMessage(t *testing.T) {
+	repo := newTestRepo(t)
+	repo.writeFile("README.md", "initial commit")
+	initialCommit := repo.commit("initial commit")
+	repo.tag("v1.0.0", initialCommit)
+
+	repo.writeFile("another-file.txt", "another commit")
+	repo.commit("feat: another commit +semver: none")
+
+	cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	assert.Contains(t, string(output), "1.0.0")
+}
+
 func TestFeatureBranch_MultipleCommits(t *testing.T) {
 	repo := newTestRepo(t)
 	repo.writeFile("README.md", "initial commit")
