@@ -10,6 +10,7 @@ type Config struct {
 	PatchVersionBumpMessage string                  `yaml:"patch-version-bump-message"`
 	NoBumpMessage           string                  `yaml:"no-bump-message"`
 	TagPrefix               string                  `yaml:"tag-prefix"`
+	Ignore                  []string                `yaml:"ignore,omitempty"`
 	Branches                map[string]BranchConfig `yaml:"branches"`
 }
 

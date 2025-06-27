@@ -115,6 +115,24 @@ func TestNoBumpMessage(t *testing.T) {
 	assert.Contains(t, string(output), "1.0.0")
 }
 
+func TestIgnoreSha(t *testing.T) {
+	repo := newTestRepo(t)
+	repo.writeFile("README.md", "initial commit")
+	initialCommit := repo.commit("initial commit")
+	repo.tag("v1.0.0", initialCommit)
+
+	repo.writeFile("another-file.txt", "another commit")
+	ignoredCommit := repo.commit("feat: another commit")
+
+	repo.writeFile("GitVersion.yml", "ignore:\n  - "+ignoredCommit.String())
+
+	cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	assert.Contains(t, string(output), "1.0.0")
+}
+
 func TestFeatureBranch_MultipleCommits(t *testing.T) {
 	repo := newTestRepo(t)
 	repo.writeFile("README.md", "initial commit")
