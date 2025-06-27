@@ -20,7 +20,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 | `major-version-bump-message` | Supported | Supported |  |
 | `minor-version-bump-message` | Supported | Supported |  |
 | `patch-version-bump-message` | Supported | Supported |  |
-| `no-bump-message` | Supported | Not Supported |  |
+| `no-bump-message` | Supported | Supported | Supports regex to match messages. Defaults to `^(\\s|\\S)*?(\\+semver:\\s?(none|skip))`. |
 | `tag-pre-release-weight` | Supported | Not Supported |  |
 | `commit-message-incrementing` | Supported | Supported | This is always enabled. |
 | `commit-date-format` | Supported | Not Supported |  |

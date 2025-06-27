@@ -92,7 +92,7 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 		return nil, 0, err
 	}
 
-	var majorRegex, minorRegex, patchRegex *regexp.Regexp
+	var majorRegex, minorRegex, patchRegex, noBumpRegex *regexp.Regexp
 	if config.MajorVersionBumpMessage != "" {
 		majorRegex, _ = regexp.Compile(config.MajorVersionBumpMessage)
 	}
@@ -102,6 +102,9 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 	if config.PatchVersionBumpMessage != "" {
 		patchRegex, _ = regexp.Compile(config.PatchVersionBumpMessage)
 	}
+	if config.NoBumpMessage != "" {
+		noBumpRegex, _ = regexp.Compile(config.NoBumpMessage)
+	}
 
 	highestBump := noBump
 	var commitsSinceTag int
@@ -110,6 +113,11 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 			return storer.ErrStop
 		}
 		commitsSinceTag++
+
+		// Check for no-bump message first
+		if noBumpRegex != nil && noBumpRegex.MatchString(c.Message) {
+			return nil
+		}
 
 		// For release branches, we don't bump based on commits.
 		if branchConfig != nil && branchConfig.Mode == "semver-from-branch" {
