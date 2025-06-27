@@ -24,7 +24,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 | `tag-pre-release-weight` | Supported | Not Supported |  |
 | `commit-message-incrementing` | Supported | Supported | This is always enabled. |
 | `commit-date-format` | Supported | Not Supported |  |
-| `ignore` | Supported | Not Supported |  |
+| `ignore` | Supported | Supported | Allows ignoring commits by SHA. |
 | `merge-message-formats` | Supported | Not Supported |  |
 | `update-build-number` | Supported | Not Supported |  |
 

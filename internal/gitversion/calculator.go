@@ -92,6 +92,14 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 		return nil, 0, err
 	}
 
+	// Create a set for ignored SHAs for efficient lookup
+	ignoredShaSet := make(map[string]struct{})
+	if config.Ignore != nil {
+		for _, sha := range config.Ignore {
+			ignoredShaSet[sha] = struct{}{}
+		}
+	}
+
 	var majorRegex, minorRegex, patchRegex, noBumpRegex *regexp.Regexp
 	if config.MajorVersionBumpMessage != "" {
 		majorRegex, _ = regexp.Compile(config.MajorVersionBumpMessage)
@@ -112,6 +120,12 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 		if latestTagCommit != nil && c.Hash == latestTagCommit.Hash {
 			return storer.ErrStop
 		}
+
+		// Check if the commit SHA is in the ignore list
+		if _, ok := ignoredShaSet[c.Hash.String()]; ok {
+			return nil
+		}
+
 		commitsSinceTag++
 
 		// Check for no-bump message first
