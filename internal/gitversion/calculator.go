@@ -116,6 +116,13 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 
 	highestBump := noBump
 	var commitsSinceTag int
+
+	// Determine the effective increment strategy
+	effectiveIncrement := config.Increment
+	if branchConfig != nil && branchConfig.Increment != "" {
+		effectiveIncrement = branchConfig.Increment
+	}
+
 	err = commitIter.ForEach(func(c *object.Commit) error {
 		if latestTagCommit != nil && c.Hash == latestTagCommit.Hash {
 			return storer.ErrStop
@@ -168,6 +175,22 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 		highestBump = maxSemverBump(highestBump, bump)
 		return nil
 	})
+
+	// Apply branch-level increment strategy if not inheriting
+	if effectiveIncrement != "" && effectiveIncrement != "Inherit" && commitsSinceTag > 0 {
+		branchBump := noBump
+		switch effectiveIncrement {
+		case "Major":
+			branchBump = majorBump
+		case "Minor":
+			branchBump = minorBump
+		case "Patch":
+			branchBump = patchBump
+		case "None":
+			// Do nothing
+		}
+		highestBump = maxSemverBump(highestBump, branchBump)
+	}
 
 	if err != nil && err != storer.ErrStop {
 		return nil, 0, err

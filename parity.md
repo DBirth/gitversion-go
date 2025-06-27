@@ -14,7 +14,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 | `assembly-versioning-format` | Supported | Not Supported | .NET-specific feature. |
 | `assembly-informational-format` | Supported | Not Supported | .NET-specific feature. |
 | `mode` | Supported | Supported |  |
-| `increment` | Supported | Partially Supported | `Inherit` is not supported. |
+| `increment` | Supported | Supported | `Inherit` is supported. |
 | `tag-prefix` | Supported | Supported | Supports regex to match prefixes. Defaults to `[vV]`. |
 | `version-in-branch-pattern` | Supported | Not Supported |  |
 | `major-version-bump-message` | Supported | Supported |  |
@@ -37,7 +37,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 | `is-source-branch-for` | Supported | Not Supported |  |
 | `mode` | Supported | Supported |  |
 | `label` | Supported | Supported | Placeholder replacement like `{BranchName}` is supported via the `tag` property. |
-| `increment` | Supported | Partially Supported | `Inherit` is not supported. |
+| `increment` | Supported | Supported | `Inherit` is supported. |
 | `prevent-increment-of-merged-branch` | Supported | Not Supported |  |
 | `prevent-increment-when-branch-merged` | Supported | Not Supported |  |
 | `prevent-increment-when-current-commit-tagged` | Supported | Not Supported |  |
