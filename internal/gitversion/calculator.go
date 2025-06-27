@@ -14,7 +14,7 @@ import (
 )
 
 // FindLatestVersion finds the latest semantic version tag in the repository.
-func FindLatestVersion(r *git.Repository) (*semver.Version, *object.Commit, error) {
+func FindLatestVersion(r *git.Repository, config *Config) (*semver.Version, *object.Commit, error) {
 	tagIter, err := r.Tags()
 	if err != nil {
 		return nil, nil, err
@@ -25,7 +25,13 @@ func FindLatestVersion(r *git.Repository) (*semver.Version, *object.Commit, erro
 
 	err = tagIter.ForEach(func(ref *plumbing.Reference) error {
 		tagName := ref.Name().Short()
-		v, err := semver.NewVersion(strings.TrimPrefix(tagName, "v"))
+		prefixRegex, err := regexp.Compile(config.TagPrefix)
+		if err != nil {
+			// Handle invalid regex in config, maybe log it
+			return nil
+		}
+		cleanedTagName := prefixRegex.ReplaceAllString(tagName, "")
+		v, err := semver.NewVersion(cleanedTagName)
 		if err != nil {
 			return nil // Ignore non-semver tags
 		}

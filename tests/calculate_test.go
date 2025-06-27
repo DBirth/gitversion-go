@@ -82,6 +82,23 @@ branches:
 	assert.True(t, strings.Contains(string(output), "1.1.0-feature-new-stuff.1"), "output was: %s", string(output))
 }
 
+func TestTagPrefix(t *testing.T) {
+	repo := newTestRepo(t)
+	repo.writeFile("README.md", "initial commit")
+	initialCommit := repo.commit("initial commit")
+	repo.tag("release-1.0.0", initialCommit)
+
+	repo.writeFile("GitVersion.yml", `tag-prefix: 'release-'`)
+	repo.writeFile("another-file.txt", "another commit")
+	repo.commit("chore: another commit")
+
+	cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	assert.Contains(t, string(output), "1.0.1")
+}
+
 func TestFeatureBranch_MultipleCommits(t *testing.T) {
 	repo := newTestRepo(t)
 	repo.writeFile("README.md", "initial commit")

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"gitversion-go/internal/gitversion"
-	"gitversion-go/internal/pkg/fs"
+	"gitversion-go/internal/fs"
 
 	"github.com/spf13/cobra"
 )
