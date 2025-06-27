@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitversion-go/internal/gitversion"
-	"gitversion-go/internal/pkg/fs"
+	"gitversion-go/internal/fs"
 )
 
 var outputFormat string
@@ -64,7 +64,7 @@ func runCalculate(fs fs.Filesystem, out io.Writer, path, outputFormat string) er
 		return fmt.Errorf("failed to get HEAD: %w", err)
 	}
 
-	latestVersion, latestTagCommit, err := gitversion.FindLatestVersion(r)
+	latestVersion, latestTagCommit, err := gitversion.FindLatestVersion(r, &config)
 	if err != nil {
 		return fmt.Errorf("failed to find latest version: %w", err)
 	}

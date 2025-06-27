@@ -15,7 +15,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 | `assembly-informational-format` | Supported | Not Supported | .NET-specific feature. |
 | `mode` | Supported | Supported |  |
 | `increment` | Supported | Partially Supported | `Inherit` is not supported. |
-| `tag-prefix` | Supported | Not Supported | `gitversion-go` does not currently support custom tag prefixes. It assumes `v` or no prefix. |
+| `tag-prefix` | Supported | Supported | Supports regex to match prefixes. Defaults to `[vV]`. |
 | `version-in-branch-pattern` | Supported | Not Supported |  |
 | `major-version-bump-message` | Supported | Supported |  |
 | `minor-version-bump-message` | Supported | Supported |  |

@@ -8,6 +8,7 @@ type Config struct {
 	MajorVersionBumpMessage string                  `yaml:"major-version-bump-message"`
 	MinorVersionBumpMessage string                  `yaml:"minor-version-bump-message"`
 	PatchVersionBumpMessage string                  `yaml:"patch-version-bump-message"`
+	TagPrefix               string                  `yaml:"tag-prefix"`
 	Branches                map[string]BranchConfig `yaml:"branches"`
 }
 
