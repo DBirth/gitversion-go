@@ -31,7 +31,12 @@ func buildVersionVariables(version semver.Version, branchName string, commitsSin
 		}
 
 		if tag != "" {
-			prerelease := fmt.Sprintf("%s.%d", tag, commitsSinceTag)
+			var prerelease string
+			if matchingBranchConfig.PreReleaseWeight > 0 {
+				prerelease = fmt.Sprintf("%s.%d.%d", tag, matchingBranchConfig.PreReleaseWeight, commitsSinceTag)
+			} else {
+				prerelease = fmt.Sprintf("%s.%d", tag, commitsSinceTag)
+			}
 			v, err := finalVersion.SetPrerelease(prerelease)
 			if err == nil {
 				finalVersion = v
