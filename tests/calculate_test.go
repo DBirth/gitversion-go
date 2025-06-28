@@ -69,7 +69,7 @@ func TestFeatureBranch(t *testing.T) {
 	repo.checkout("feature/new-stuff")
 	repo.writeFile("GitVersion.yml", `
 branches:
-  feature/*:
+  feature/.*:
     tag: use-branch-name
 `)
 	repo.writeFile("feature-file.txt", "new feature on a branch")
@@ -143,7 +143,7 @@ func TestIncrementSetting(t *testing.T) {
 		repo.checkout("feature/new-stuff")
 		repo.writeFile("GitVersion.yml", `
 branches:
-  feature/*:
+  feature/.*:
     increment: Minor
 `)
 		repo.writeFile("feature-file.txt", "new feature on a branch")
@@ -165,7 +165,7 @@ branches:
 		repo.checkout("feature/new-stuff")
 		repo.writeFile("GitVersion.yml", `
 branches:
-  feature/*:
+  feature/.*:
     increment: Inherit
 `)
 		repo.writeFile("feature-file.txt", "new feature on a branch")
@@ -205,7 +205,7 @@ branches:
 		repo.writeFile("GitVersion.yml", `
 increment: Major
 branches:
-  feature/*:
+  feature/.*:
     increment: Patch
 `)
 		repo.writeFile("feature-file.txt", "new feature on a branch")
@@ -219,6 +219,50 @@ branches:
 	})
 }
 
+func TestTagPreReleaseWeight(t *testing.T) {
+	repo := newTestRepo(t)
+	repo.writeFile("README.md", "initial commit")
+	initialCommit := repo.commit("initial commit")
+	repo.tag("v1.0.0-beta.5", initialCommit)
+
+	repo.writeFile("another-file.txt", "another commit")
+	rcCommit := repo.commit("feat: another commit")
+	repo.tag("v1.0.0-rc.1", rcCommit)
+
+	repo.writeFile("GitVersion.yml", `tag-pre-release-weight:
+  beta: 1000
+  rc: 2000`)
+
+	cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	assert.Contains(t, string(output), "1.0.0-rc.1")
+}
+
+func TestPreReleaseWeight(t *testing.T) {
+	repo := newTestRepo(t)
+	repo.writeFile("README.md", "initial commit")
+	initialCommit := repo.commit("initial commit")
+	repo.tag("v1.0.0", initialCommit)
+
+	repo.checkout("release/1.1.0")
+	repo.writeFile("GitVersion.yml", `
+branches:
+  release/.*:
+    tag: beta
+    pre-release-weight: 1000
+`)
+	repo.writeFile("release-notes.txt", "add release notes")
+	repo.commit("docs: add release notes")
+
+	cmd := exec.Command(binaryPath, "calculate", "--path", repo.path)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	assert.Contains(t, string(output), "1.0.1-beta.1000.1")
+}
+
 func TestFeatureBranch_MultipleCommits(t *testing.T) {
 	repo := newTestRepo(t)
 	repo.writeFile("README.md", "initial commit")
@@ -228,7 +272,7 @@ func TestFeatureBranch_MultipleCommits(t *testing.T) {
 	repo.checkout("feature/new-stuff")
 	repo.writeFile("GitVersion.yml", `
 branches:
-  feature/*:
+  feature/.*:
     tag: use-branch-name
 `)
 	repo.writeFile("feature-file.txt", "new feature on a branch")

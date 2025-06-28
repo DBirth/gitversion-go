@@ -1,6 +1,6 @@
 package gitversion
 
-import "strings"
+import "regexp"
 
 // Config represents the structure of the GitVersion.yml file.
 type Config struct {
@@ -12,6 +12,7 @@ type Config struct {
 	TagPrefix               string                  `yaml:"tag-prefix"`
 	Ignore                  []string                `yaml:"ignore,omitempty"`
 	Increment               string                  `yaml:"increment,omitempty"`
+	TagPreReleaseWeight     map[string]int          `yaml:"tag-pre-release-weight,omitempty"`
 	Branches                map[string]BranchConfig `yaml:"branches"`
 }
 
@@ -20,6 +21,7 @@ type BranchConfig struct {
 	Mode            string `yaml:"mode"`
 	Tag             string `yaml:"tag"`
 	Increment       string `yaml:"increment,omitempty"`
+	PreReleaseWeight int    `yaml:"pre-release-weight,omitempty"`
 	IsReleaseBranch *bool  `yaml:"is-release-branch,omitempty"`
 }
 
@@ -29,31 +31,25 @@ func (c *Config) GetBranchConfig(branchName string) *BranchConfig {
 		return nil
 	}
 
-	// Direct match has priority
-	if config, ok := c.Branches[branchName]; ok {
-		return &config
-	}
+	var bestMatchConfig *BranchConfig
+	var bestMatchPatternLength = -1
 
-	// Wildcard match
-	var bestMatchKey string
-	var bestMatchLen int
-	for key := range c.Branches {
-		if strings.HasSuffix(key, "/*") {
-			prefix := key[:len(key)-1] // e.g. "feature/"
-			if strings.HasPrefix(branchName, prefix) {
-				// Find the most specific match (longest prefix)
-				if len(prefix) > bestMatchLen {
-					bestMatchKey = key
-					bestMatchLen = len(prefix)
-				}
+	for pattern, config := range c.Branches {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			// Invalid regex in config, maybe log it
+			continue
+		}
+		if re.MatchString(branchName) {
+			// This is a match. Is it better than the previous best match?
+			if len(pattern) > bestMatchPatternLength {
+				bestMatchPatternLength = len(pattern)
+				// Important: make a copy of config to avoid capturing loop variable
+				branchConfigCopy := config
+				bestMatchConfig = &branchConfigCopy
 			}
 		}
 	}
 
-	if bestMatchKey != "" {
-		config := c.Branches[bestMatchKey]
-		return &config
-	}
-
-	return nil
+	return bestMatchConfig
 }

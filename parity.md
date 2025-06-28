@@ -21,7 +21,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 | `minor-version-bump-message` | Supported | Supported |  |
 | `patch-version-bump-message` | Supported | Supported |  |
 | `no-bump-message` | Supported | Supported | Supports regex to match messages. Defaults to `^(\\s|\\S)*?(\\+semver:\\s?(none|skip))`. |
-| `tag-pre-release-weight` | Supported | Not Supported |  |
+| `tag-pre-release-weight` | Supported | Supported |  |
 | `commit-message-incrementing` | Supported | Supported | This is always enabled. |
 | `commit-date-format` | Supported | Not Supported |  |
 | `ignore` | Supported | Supported | Allows ignoring commits by SHA. |
@@ -47,6 +47,6 @@ This document outlines the feature parity between this Go implementation (`gitve
 | `tracks-release-branches` | Supported | Not Supported |  |
 | `is-release-branch` | Supported | Not Supported |  |
 | `is-main-branch` | Supported | Not Supported |  |
-| `pre-release-weight` | Supported | Not Supported |  |
+| `pre-release-weight` | Supported | Supported |  |
 | `semantic-version-format` | Supported | Not Supported |  |
 | `strategies` | Supported | Not Supported | `gitversion-go` uses a simplified, hardcoded strategy. |

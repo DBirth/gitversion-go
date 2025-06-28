@@ -23,6 +23,45 @@ func FindLatestVersion(r *git.Repository, config *Config) (*semver.Version, *obj
 	var latestVersion *semver.Version
 	var latestTag *plumbing.Reference
 
+	isGreaterThan := func(v1, v2 *semver.Version) bool {
+		// If major, minor, or patch are different, standard comparison is enough.
+		if v1.Major() != v2.Major() || v1.Minor() != v2.Minor() || v1.Patch() != v2.Patch() {
+			return v1.GreaterThan(v2)
+		}
+
+		// If we are here, major.minor.patch are the same. Compare pre-release tags.
+		prerelease1 := v1.Prerelease()
+		prerelease2 := v2.Prerelease()
+
+		// A version without a prerelease tag has higher precedence
+		if prerelease1 == "" && prerelease2 != "" {
+			return true
+		}
+		if prerelease1 != "" && prerelease2 == "" {
+			return false
+		}
+		if prerelease1 == "" && prerelease2 == "" {
+			return false // they are equal
+		}
+
+		// Extract the tag name (e.g., "alpha" from "alpha.1")
+		tag1 := strings.Split(prerelease1, ".")[0]
+		tag2 := strings.Split(prerelease2, ".")[0]
+
+		weight1, ok1 := config.TagPreReleaseWeight[tag1]
+		weight2, ok2 := config.TagPreReleaseWeight[tag2]
+
+		// If both tags have weights defined, compare them.
+		if ok1 && ok2 {
+			if weight1 != weight2 {
+				return weight1 > weight2
+			}
+		}
+
+		// Fallback to standard semver comparison
+		return v1.GreaterThan(v2)
+	}
+
 	err = tagIter.ForEach(func(ref *plumbing.Reference) error {
 		tagName := ref.Name().Short()
 		prefixRegex, err := regexp.Compile(config.TagPrefix)
@@ -36,7 +75,7 @@ func FindLatestVersion(r *git.Repository, config *Config) (*semver.Version, *obj
 			return nil // Ignore non-semver tags
 		}
 
-		if latestVersion == nil || v.GreaterThan(latestVersion) {
+		if latestVersion == nil || isGreaterThan(v, latestVersion) {
 			latestVersion = v
 			latestTag = ref
 		}
@@ -209,7 +248,12 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 				// Always apply tag if configured, regardless of commits
 				if branchConfig.Tag != "" {
 					prerelease := branchConfig.Tag
-					finalPrerelease := fmt.Sprintf("%s.%d", prerelease, commitsSinceTag)
+					var finalPrerelease string
+					if branchConfig.PreReleaseWeight > 0 {
+						finalPrerelease = fmt.Sprintf("%s.%d.%d", prerelease, branchConfig.PreReleaseWeight, commitsSinceTag)
+					} else {
+						finalPrerelease = fmt.Sprintf("%s.%d", prerelease, commitsSinceTag)
+					}
 					nextVersion, err = nextVersion.SetPrerelease(finalPrerelease)
 					if err != nil {
 						return nil, 0, err
@@ -243,18 +287,24 @@ func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, late
 			prerelease = Sanitize(branchName)
 		}
 		var err error
-		// If we have a pre-release tag and there was no version bump, we might need to append to a non-bumped version
-		// But only if there are commits. If no commits, we just return the latest version.
 		if commitsSinceTag > 0 {
-			finalPrerelease := fmt.Sprintf("%s.%d", prerelease, commitsSinceTag)
+			var finalPrerelease string
+			if branchConfig.PreReleaseWeight > 0 {
+				finalPrerelease = fmt.Sprintf("%s.%d.%d", prerelease, branchConfig.PreReleaseWeight, commitsSinceTag)
+			} else {
+				finalPrerelease = fmt.Sprintf("%s.%d", prerelease, commitsSinceTag)
+			}
 			nextVersion, err = nextVersion.SetPrerelease(finalPrerelease)
 			if err != nil {
 				return nil, 0, err
 			}
-		} else if bumpToApply == noBump {
-			// No commits, no bump, but a tag exists (e.g. on a release branch before any commits)
-			// In this case, we often want version 0 of the pre-release
-			finalPrerelease := fmt.Sprintf("%s.0", prerelease)
+		} else if nextVersion.Prerelease() == "" {
+			var finalPrerelease string
+			if branchConfig.PreReleaseWeight > 0 {
+				finalPrerelease = fmt.Sprintf("%s.%d.%d", prerelease, branchConfig.PreReleaseWeight, 0)
+			} else {
+				finalPrerelease = fmt.Sprintf("%s.%d", prerelease, 0)
+			}
 			nextVersion, err = nextVersion.SetPrerelease(finalPrerelease)
 			if err != nil {
 				return nil, 0, err
