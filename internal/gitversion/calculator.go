@@ -2,432 +2,197 @@
 package gitversion
 
 import (
+	"errors"
 	"fmt"
-	"regexp"
-	"strings"
+	"sort"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/storer"
 )
 
+// CalculateNextVersion calculates the next version based on the commit history using a strategy-based approach.
+func CalculateNextVersion(r *git.Repository, config *Config, currentBranchName string) (*semver.Version, int, error) {
+	strategies, err := BuildStrategies(config, currentBranchName)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	executor := NewStrategyExecutor(strategies)
+	ctx := &VersionContext{
+		Repository:        r,
+		Config:            config,
+		CurrentBranchName: currentBranchName,
+	}
+
+	if err := executor.ExecuteStrategies(ctx); err != nil {
+		return nil, 0, err
+	}
+
+	if ctx.NextVersion == nil {
+		if ctx.BaseVersion != nil {
+			return ctx.BaseVersion, ctx.CommitsSinceLastTag, nil
+		}
+		// Fallback to 0.1.0 if no version could be determined.
+		v := semver.MustParse("0.1.0")
+		return v, 0, nil
+	}
+
+	return ctx.NextVersion, ctx.CommitsSinceLastTag, nil
+}
+
 // FindLatestVersion finds the latest semantic version tag in the repository.
+// It first checks the source branches of the current branch, if any.
+// If no version is found on the source branches, it searches all tags.
 func FindLatestVersion(r *git.Repository, config *Config, currentBranchName string) (*semver.Version, *object.Commit, error) {
 	branchConfig := config.GetBranchConfig(currentBranchName)
-
-	// If source-branches are defined, search for versions on them
 	if branchConfig != nil && len(branchConfig.SourceBranches) > 0 {
 		latestVersion, latestTagCommit, err := findVersionOnBranches(r, config, branchConfig.SourceBranches)
 		if err != nil {
 			return nil, nil, err
 		}
-		// If a version is found on source branches, return it.
-		// Otherwise, fall through to the global search.
 		if latestVersion != nil {
 			return latestVersion, latestTagCommit, nil
 		}
 	}
 
-	// Fallback to searching all tags in the repository
 	return findLatestVersionAllTags(r, config)
 }
 
-// findVersionOnBranches searches for the latest tag on a specific list of branches.
 func findVersionOnBranches(r *git.Repository, config *Config, branchNames []string) (*semver.Version, *object.Commit, error) {
-	tagsMap, err := buildTagMap(r)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var latestVersion *semver.Version
-	var latestTagCommit *object.Commit
-	isGreaterThan := createIsGreaterThanFunc(config)
+	var versions []*semver.Version
+	tagCommitMap := make(map[*semver.Version]*object.Commit)
 
 	for _, branchName := range branchNames {
 		branchRef, err := r.Reference(plumbing.NewBranchReferenceName(branchName), true)
 		if err != nil {
-			// Branch not found, log and skip
-			continue
+			if errors.Is(err, plumbing.ErrReferenceNotFound) {
+				continue
+			}
+			return nil, nil, err
 		}
 
-		commitIter, err := r.Log(&git.LogOptions{From: branchRef.Hash()})
+		commit, err := r.CommitObject(branchRef.Hash())
 		if err != nil {
-			continue
+			return nil, nil, err
+		}
+
+		tags, err := getTags(r)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		commitIter, err := r.Log(&git.LogOptions{From: commit.Hash})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		commitTags := make(map[plumbing.Hash][]string)
+		for _, tag := range tags {
+			// TODO: This is inefficient. We should get the commit from the tag ref instead.
+			commitTags[tag.Hash()] = append(commitTags[tag.Hash()], tag.Name().Short())
 		}
 
 		err = commitIter.ForEach(func(c *object.Commit) error {
-			if refs, ok := tagsMap[c.Hash]; ok {
-				for _, ref := range refs {
-					v, err := versionFromTag(ref, config)
-					if err != nil {
-						continue // Ignore non-semver tags
-					}
-
-					if latestVersion == nil || isGreaterThan(v, latestVersion) {
-						latestVersion = v
-						latestTagCommit = c
+			if tagNames, ok := commitTags[c.Hash]; ok {
+				for _, tagName := range tagNames {
+					v, err := semver.NewVersion(tagName)
+					if err == nil {
+						versions = append(versions, v)
+						tagCommitMap[v] = c
 					}
 				}
 			}
 			return nil
 		})
-
-		if err != nil && err != storer.ErrStop {
+		if err != nil {
 			return nil, nil, err
 		}
 	}
 
-	return latestVersion, latestTagCommit, nil
-}
-
-// findLatestVersionAllTags searches all tags in the repository for the latest version.
-func findLatestVersionAllTags(r *git.Repository, config *Config) (*semver.Version, *object.Commit, error) {
-	tagIter, err := r.Tags()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var latestVersion *semver.Version
-	var latestTag *plumbing.Reference
-	isGreaterThan := createIsGreaterThanFunc(config)
-
-	err = tagIter.ForEach(func(ref *plumbing.Reference) error {
-		v, err := versionFromTag(ref, config)
-		if err != nil {
-			return nil // Ignore non-semver tags
-		}
-
-		if latestVersion == nil || isGreaterThan(v, latestVersion) {
-			latestVersion = v
-			latestTag = ref
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if latestTag == nil {
+	if len(versions) == 0 {
 		return nil, nil, nil
 	}
 
-	latestTagCommit, err := getCommitFromTag(r, latestTag)
+	// Sort versions
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i].LessThan(versions[j])
+	})
+
+	latestVersion := versions[len(versions)-1]
+	return latestVersion, tagCommitMap[latestVersion], nil
+}
+
+func findLatestVersionAllTags(r *git.Repository, config *Config) (*semver.Version, *object.Commit, error) {
+	tagRefs, err := r.Tags()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return latestVersion, latestTagCommit, nil
-}
+	var versions []*semver.Version
+	tagCommitMap := make(map[*semver.Version]*object.Commit)
 
-// buildTagMap creates a map from commit hash to tag references.
-func buildTagMap(r *git.Repository) (map[plumbing.Hash][]*plumbing.Reference, error) {
-	tagsMap := make(map[plumbing.Hash][]*plumbing.Reference)
-	tagIter, err := r.Tags()
-	if err != nil {
-		return nil, err
-	}
-	err = tagIter.ForEach(func(ref *plumbing.Reference) error {
-		commit, err := getCommitFromTag(r, ref)
-		if err != nil {
-			// Cannot resolve tag, maybe log it and skip
-			return nil
+	err = tagRefs.ForEach(func(ref *plumbing.Reference) error {
+		v, err := semver.NewVersion(ref.Name().Short())
+		if err == nil {
+			commit, err := getCommitFromTag(r, ref)
+			if err != nil {
+				// Cannot resolve tag, skip
+				return nil
+			}
+			versions = append(versions, v)
+			tagCommitMap[v] = commit
 		}
-		tagsMap[commit.Hash] = append(tagsMap[commit.Hash], ref)
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return tagsMap, nil
+
+	if len(versions) == 0 {
+		return nil, nil, nil
+	}
+
+	// Sort versions
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i].LessThan(versions[j])
+	})
+
+	latestVersion := versions[len(versions)-1]
+	return latestVersion, tagCommitMap[latestVersion], nil
 }
 
-// getCommitFromTag resolves a tag reference to its commit, handling both lightweight and annotated tags.
 func getCommitFromTag(r *git.Repository, ref *plumbing.Reference) (*object.Commit, error) {
-	// CommitObject will resolve annotated tags to their underlying commit.
-	// For lightweight tags, the hash already points to a commit.
-	commit, err := r.CommitObject(ref.Hash())
-	if err != nil {
-		// If the tag points to something other than a commit (e.g., a tree or blob),
-		// CommitObject will fail. We treat this as an unresolvable tag for versioning.
-		return nil, fmt.Errorf("failed to resolve tag %s to commit: %w", ref.Name(), err)
-	}
-	return commit, nil
-}
-
-// versionFromTag extracts a semantic version from a tag reference.
-func versionFromTag(ref *plumbing.Reference, config *Config) (*semver.Version, error) {
-	tagName := ref.Name().Short()
-	prefixRegex, err := regexp.Compile(config.TagPrefix)
+	obj, err := r.Object(plumbing.AnyObject, ref.Hash())
 	if err != nil {
 		return nil, err
 	}
-	cleanedTagName := prefixRegex.ReplaceAllString(tagName, "")
-	return semver.NewVersion(cleanedTagName)
-}
 
-// createIsGreaterThanFunc returns a function that compares two semantic versions,
-// considering the tag-pre-release-weight configuration.
-func createIsGreaterThanFunc(config *Config) func(v1, v2 *semver.Version) bool {
-	return func(v1, v2 *semver.Version) bool {
-		// If major, minor, or patch are different, standard comparison is enough.
-		if v1.Major() != v2.Major() || v1.Minor() != v2.Minor() || v1.Patch() != v2.Patch() {
-			return v1.GreaterThan(v2)
-		}
-
-		// If we are here, major.minor.patch are the same. Compare pre-release tags.
-		prerelease1 := v1.Prerelease()
-		prerelease2 := v2.Prerelease()
-
-		// A version without a prerelease tag has higher precedence
-		if prerelease1 == "" && prerelease2 != "" {
-			return true
-		}
-		if prerelease1 != "" && prerelease2 == "" {
-			return false
-		}
-		if prerelease1 == "" && prerelease2 == "" {
-			return false // they are equal
-		}
-
-		// Extract the tag name (e.g., "alpha" from "alpha.1")
-		tag1 := strings.Split(prerelease1, ".")[0]
-		tag2 := strings.Split(prerelease2, ".")[0]
-
-		weight1, ok1 := config.TagPreReleaseWeight[tag1]
-		weight2, ok2 := config.TagPreReleaseWeight[tag2]
-
-		// If both tags have weights defined, compare them.
-		if ok1 && ok2 {
-			if weight1 != weight2 {
-				return weight1 > weight2
-			}
-		}
-
-		// Fallback to standard semver comparison
-		return v1.GreaterThan(v2)
+	switch o := obj.(type) {
+	case *object.Commit:
+		return o, nil
+	case *object.Tag:
+		return o.Commit()
+	default:
+		return nil, fmt.Errorf("unexpected object type %s for tag %s", o.Type(), ref.Name())
 	}
 }
 
-type semverBump int
-
-const (
-	noBump semverBump = iota
-	patchBump
-	minorBump
-	majorBump
-)
-
-// CalculateNextVersion calculates the next version based on the commit history.
-func CalculateNextVersion(r *git.Repository, latestVersion *semver.Version, latestTagCommit *object.Commit, config *Config) (*semver.Version, int, error) {
-	head, err := r.Head()
+func getTags(r *git.Repository) ([]*plumbing.Reference, error) {
+	iter, err := r.Tags()
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	branchName := head.Name().Short()
-	branchConfig := config.GetBranchConfig(branchName)
-
-	// --- Count commits and determine bump ---
-	commitIter, err := r.Log(&git.LogOptions{From: head.Hash()})
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Create a set for ignored SHAs for efficient lookup
-	ignoredShaSet := make(map[string]struct{})
-	if config.Ignore != nil {
-		for _, sha := range config.Ignore {
-			ignoredShaSet[sha] = struct{}{}
-		}
-	}
-
-	var majorRegex, minorRegex, patchRegex, noBumpRegex *regexp.Regexp
-	if config.MajorVersionBumpMessage != "" {
-		majorRegex, _ = regexp.Compile(config.MajorVersionBumpMessage)
-	}
-	if config.MinorVersionBumpMessage != "" {
-		minorRegex, _ = regexp.Compile(config.MinorVersionBumpMessage)
-	}
-	if config.PatchVersionBumpMessage != "" {
-		patchRegex, _ = regexp.Compile(config.PatchVersionBumpMessage)
-	}
-	if config.NoBumpMessage != "" {
-		noBumpRegex, _ = regexp.Compile(config.NoBumpMessage)
-	}
-
-	highestBump := noBump
-	var commitsSinceTag int
-
-	// Determine the effective increment strategy
-	effectiveIncrement := config.Increment
-	if branchConfig != nil && branchConfig.Increment != "" {
-		effectiveIncrement = branchConfig.Increment
-	}
-
-	err = commitIter.ForEach(func(c *object.Commit) error {
-		if latestTagCommit != nil && c.Hash == latestTagCommit.Hash {
-			return storer.ErrStop
-		}
-
-		// Check if the commit SHA is in the ignore list
-		if _, ok := ignoredShaSet[c.Hash.String()]; ok {
-			return nil
-		}
-
-		commitsSinceTag++
-
-		// Check for no-bump message first
-		if noBumpRegex != nil && noBumpRegex.MatchString(c.Message) {
-			return nil
-		}
-
-		// For release branches, we don't bump based on commits.
-		if branchConfig != nil && branchConfig.Mode == "semver-from-branch" {
-			return nil
-		}
-
-		bump := noBump
-		commitLines := strings.Split(c.Message, "\n")
-		header := commitLines[0]
-		conventionalCommitRegex := regexp.MustCompile(`^(feat|fix|build|chore|ci|docs|perf|refactor|revert|style|test)(\(.*\))?(!?):`)
-		matches := conventionalCommitRegex.FindStringSubmatch(header)
-		isBreaking := strings.Contains(c.Message, "BREAKING CHANGE:") || (len(matches) > 3 && matches[3] == "!")
-
-		if isBreaking {
-			bump = majorBump
-		} else if len(matches) > 1 {
-			switch matches[1] {
-			case "feat":
-				bump = minorBump
-			case "fix":
-				bump = patchBump
-			}
-		}
-
-		if bump == noBump {
-			if majorRegex != nil && majorRegex.MatchString(c.Message) {
-				bump = majorBump
-			} else if minorRegex != nil && minorRegex.MatchString(c.Message) {
-				bump = minorBump
-			} else if patchRegex != nil && patchRegex.MatchString(c.Message) {
-				bump = patchBump
-			}
-		}
-		highestBump = maxSemverBump(highestBump, bump)
+	var tags []*plumbing.Reference
+	err = iter.ForEach(func(ref *plumbing.Reference) error {
+		tags = append(tags, ref)
 		return nil
 	})
-
-	// Apply branch-level increment strategy if not inheriting
-	if effectiveIncrement != "" && effectiveIncrement != "Inherit" && commitsSinceTag > 0 {
-		branchBump := noBump
-		switch effectiveIncrement {
-		case "Major":
-			branchBump = majorBump
-		case "Minor":
-			branchBump = minorBump
-		case "Patch":
-			branchBump = patchBump
-		case "None":
-			// Do nothing
-		}
-		highestBump = maxSemverBump(highestBump, branchBump)
+	if err != nil {
+		return nil, err
 	}
-
-	if err != nil && err != storer.ErrStop {
-		return nil, 0, err
-	}
-
-	// --- Calculate next version ---
-
-	// Handle semver-from-branch mode
-	if branchConfig != nil && branchConfig.Mode == "semver-from-branch" {
-		re := regexp.MustCompile(`(\d+\.\d+\.\d+)`)
-		matches := re.FindStringSubmatch(branchName)
-		if len(matches) > 1 {
-			baseVersion, err := semver.NewVersion(matches[1])
-			if err == nil {
-				nextVersion := *baseVersion
-				// Always apply tag if configured, regardless of commits
-				if branchConfig.Tag != "" {
-					prerelease := branchConfig.Tag
-					var finalPrerelease string
-					if branchConfig.PreReleaseWeight > 0 {
-						finalPrerelease = fmt.Sprintf("%s.%d.%d", prerelease, branchConfig.PreReleaseWeight, commitsSinceTag)
-					} else {
-						finalPrerelease = fmt.Sprintf("%s.%d", prerelease, commitsSinceTag)
-					}
-					nextVersion, err = nextVersion.SetPrerelease(finalPrerelease)
-					if err != nil {
-						return nil, 0, err
-					}
-				}
-				return &nextVersion, commitsSinceTag, nil
-			}
-		}
-	}
-
-	// Handle regular versioning
-	bumpToApply := highestBump
-	if commitsSinceTag > 0 && bumpToApply == noBump && (branchConfig == nil || branchConfig.Mode != "semver-from-branch") {
-		bumpToApply = patchBump // Default to patch if there are commits but no bump messages
-	}
-
-	var nextVersion semver.Version
-	if bumpToApply == majorBump {
-		nextVersion = latestVersion.IncMajor()
-	} else if bumpToApply == minorBump {
-		nextVersion = latestVersion.IncMinor()
-	} else if bumpToApply == patchBump {
-		nextVersion = latestVersion.IncPatch()
-	} else {
-		nextVersion = *latestVersion
-	}
-
-	if branchConfig != nil && branchConfig.Tag != "" {
-		prerelease := branchConfig.Tag
-		if branchConfig.Tag == "use-branch-name" {
-			prerelease = Sanitize(branchName)
-		}
-		var err error
-		if commitsSinceTag > 0 {
-			var finalPrerelease string
-			if branchConfig.PreReleaseWeight > 0 {
-				finalPrerelease = fmt.Sprintf("%s.%d.%d", prerelease, branchConfig.PreReleaseWeight, commitsSinceTag)
-			} else {
-				finalPrerelease = fmt.Sprintf("%s.%d", prerelease, commitsSinceTag)
-			}
-			nextVersion, err = nextVersion.SetPrerelease(finalPrerelease)
-			if err != nil {
-				return nil, 0, err
-			}
-		} else if nextVersion.Prerelease() == "" {
-			var finalPrerelease string
-			if branchConfig.PreReleaseWeight > 0 {
-				finalPrerelease = fmt.Sprintf("%s.%d.%d", prerelease, branchConfig.PreReleaseWeight, 0)
-			} else {
-				finalPrerelease = fmt.Sprintf("%s.%d", prerelease, 0)
-			}
-			nextVersion, err = nextVersion.SetPrerelease(finalPrerelease)
-			if err != nil {
-				return nil, 0, err
-			}
-		}
-	}
-
-	return &nextVersion, commitsSinceTag, nil
+	return tags, nil
 }
 
-// Sanitize prepares a branch name for use in a pre-release tag.
-func Sanitize(branchName string) string {
-	return strings.ReplaceAll(branchName, "/", "-")
-}
-
-// maxSemverBump returns the larger of two semverBumps.
-func maxSemverBump(a, b semverBump) semverBump {
-	if a > b {
-		return a
-	}
-	return b
-}
