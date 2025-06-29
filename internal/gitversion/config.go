@@ -18,11 +18,12 @@ type Config struct {
 
 // BranchConfig represents the configuration for a specific branch.
 type BranchConfig struct {
-	Mode            string `yaml:"mode"`
-	Tag             string `yaml:"tag"`
-	Increment       string `yaml:"increment,omitempty"`
-	PreReleaseWeight int    `yaml:"pre-release-weight,omitempty"`
-	IsReleaseBranch *bool  `yaml:"is-release-branch,omitempty"`
+	Mode             string   `yaml:"mode"`
+	Tag              string   `yaml:"tag"`
+	Increment        string   `yaml:"increment,omitempty"`
+	PreReleaseWeight int      `yaml:"pre-release-weight,omitempty"`
+	SourceBranches   []string `yaml:"source-branches,omitempty"`
+	IsReleaseBranch  *bool    `yaml:"is-release-branch,omitempty"`
 }
 
 // GetBranchConfig returns the configuration for a specific branch.

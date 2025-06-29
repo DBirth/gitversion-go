@@ -64,7 +64,7 @@ func runCalculate(fs fs.Filesystem, out io.Writer, path, outputFormat string) er
 		return fmt.Errorf("failed to get HEAD: %w", err)
 	}
 
-	latestVersion, latestTagCommit, err := gitversion.FindLatestVersion(r, &config)
+	latestVersion, latestTagCommit, err := gitversion.FindLatestVersion(r, &config, head.Name().Short())
 	if err != nil {
 		return fmt.Errorf("failed to find latest version: %w", err)
 	}

@@ -95,6 +95,7 @@ branches:
     -   `mode`: (Optional) The versioning mode for the branch. `ContinuousDeployment` is a common mode for development branches.
     -   `tag`: The prerelease tag to use for the branch. If set to `use-branch-name`, the branch name will be sanitized and used as the prerelease tag (e.g., `feature/new-stuff` becomes `feature-new-stuff`).
     -   `pre-release-weight`: (Optional) An integer value that can be used to order prerelease versions. When set, the prerelease tag will be formatted as `<tag>.<weight>.<commit-count>`. This is useful for distinguishing between builds from different release branches.
+    -   `source-branches`: (Optional) A list of branches from which the current branch can inherit its version. If a branch does not have any version tags, GitVersion will look at the specified source branches to find the latest version. This is useful for feature branches that are created from a development branch and should be based on the version of that development branch.
 -   `tag-pre-release-weight`: (Optional) A map of pre-release tag names to integer weights. This global configuration allows you to define the sorting order of pre-release tags. For example, you can specify that `rc` tags should have a higher weight than `beta` tags, ensuring that `1.0.0-rc.1` is considered a later version than `1.0.0-beta.5`.
 
 ## Credits and Disclaimer
