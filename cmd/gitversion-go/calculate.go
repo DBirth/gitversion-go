@@ -63,23 +63,13 @@ func runCalculate(fs fs.Filesystem, out io.Writer, path, outputFormat string) er
 	if err != nil {
 		return fmt.Errorf("failed to get HEAD: %w", err)
 	}
+	branchName := head.Name().Short()
 
-	latestVersion, latestTagCommit, err := gitversion.FindLatestVersion(r, &config, head.Name().Short())
-	if err != nil {
-		return fmt.Errorf("failed to find latest version: %w", err)
-	}
-
-	if latestVersion == nil {
-		_, err := fmt.Fprintln(out, "No semantic version tags found.")
-		return err
-	}
-
-	nextVersion, commitsSinceTag, err := gitversion.CalculateNextVersion(r, latestVersion, latestTagCommit, &config)
+	nextVersion, commitsSinceTag, err := gitversion.CalculateNextVersion(r, &config, branchName)
 	if err != nil {
 		return fmt.Errorf("failed to calculate next version: %w", err)
 	}
 
-	branchName := head.Name().Short()
 	vars := buildVersionVariables(*nextVersion, branchName, commitsSinceTag, &config)
 
 	switch outputFormat {
@@ -92,9 +82,6 @@ func runCalculate(fs fs.Filesystem, out io.Writer, path, outputFormat string) er
 			return err
 		}
 	default:
-		if _, err := fmt.Fprintf(out, "Latest version found: %s\n", latestVersion.String()); err != nil {
-			return err
-		}
 		if _, err := fmt.Fprintf(out, "Calculated next version: %s\n", vars.FullSemVer); err != nil {
 			return err
 		}

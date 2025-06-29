@@ -13,6 +13,7 @@ type Config struct {
 	Ignore                  []string                `yaml:"ignore,omitempty"`
 	Increment               string                  `yaml:"increment,omitempty"`
 	TagPreReleaseWeight     map[string]int          `yaml:"tag-pre-release-weight,omitempty"`
+	Strategies              []string                `yaml:"strategies,omitempty"`
 	Branches                map[string]BranchConfig `yaml:"branches"`
 }
 
@@ -23,7 +24,9 @@ type BranchConfig struct {
 	Increment        string   `yaml:"increment,omitempty"`
 	PreReleaseWeight int      `yaml:"pre-release-weight,omitempty"`
 	SourceBranches   []string `yaml:"source-branches,omitempty"`
+	Strategies       []string `yaml:"strategies,omitempty"`
 	IsReleaseBranch  *bool    `yaml:"is-release-branch,omitempty"`
+	PreventIncrement bool     `yaml:"prevent-increment,omitempty"`
 }
 
 // GetBranchConfig returns the configuration for a specific branch.
