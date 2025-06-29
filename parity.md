@@ -33,7 +33,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 | Feature | Original GitVersion | gitversion-go | Notes |
 | :--- | :---: | :---: | :--- |
 | `regex` | Supported | Supported |  |
-| `source-branches` | Supported | Not Supported |  |
+| `source-branches` | Supported | Supported |  |
 | `is-source-branch-for` | Supported | Not Supported |  |
 | `mode` | Supported | Supported |  |
 | `label` | Supported | Supported | Placeholder replacement like `{BranchName}` is supported via the `tag` property. |

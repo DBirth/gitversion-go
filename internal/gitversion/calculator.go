@@ -14,7 +14,76 @@ import (
 )
 
 // FindLatestVersion finds the latest semantic version tag in the repository.
-func FindLatestVersion(r *git.Repository, config *Config) (*semver.Version, *object.Commit, error) {
+func FindLatestVersion(r *git.Repository, config *Config, currentBranchName string) (*semver.Version, *object.Commit, error) {
+	branchConfig := config.GetBranchConfig(currentBranchName)
+
+	// If source-branches are defined, search for versions on them
+	if branchConfig != nil && len(branchConfig.SourceBranches) > 0 {
+		latestVersion, latestTagCommit, err := findVersionOnBranches(r, config, branchConfig.SourceBranches)
+		if err != nil {
+			return nil, nil, err
+		}
+		// If a version is found on source branches, return it.
+		// Otherwise, fall through to the global search.
+		if latestVersion != nil {
+			return latestVersion, latestTagCommit, nil
+		}
+	}
+
+	// Fallback to searching all tags in the repository
+	return findLatestVersionAllTags(r, config)
+}
+
+// findVersionOnBranches searches for the latest tag on a specific list of branches.
+func findVersionOnBranches(r *git.Repository, config *Config, branchNames []string) (*semver.Version, *object.Commit, error) {
+	tagsMap, err := buildTagMap(r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var latestVersion *semver.Version
+	var latestTagCommit *object.Commit
+	isGreaterThan := createIsGreaterThanFunc(config)
+
+	for _, branchName := range branchNames {
+		branchRef, err := r.Reference(plumbing.NewBranchReferenceName(branchName), true)
+		if err != nil {
+			// Branch not found, log and skip
+			continue
+		}
+
+		commitIter, err := r.Log(&git.LogOptions{From: branchRef.Hash()})
+		if err != nil {
+			continue
+		}
+
+		err = commitIter.ForEach(func(c *object.Commit) error {
+			if refs, ok := tagsMap[c.Hash]; ok {
+				for _, ref := range refs {
+					v, err := versionFromTag(ref, config)
+					if err != nil {
+						continue // Ignore non-semver tags
+					}
+
+					if latestVersion == nil || isGreaterThan(v, latestVersion) {
+						latestVersion = v
+						latestTagCommit = c
+					}
+				}
+			}
+			return nil
+		})
+
+		if err != nil && err != storer.ErrStop {
+			return nil, nil, err
+		}
+	}
+
+	return latestVersion, latestTagCommit, nil
+}
+
+// findLatestVersionAllTags searches all tags in the repository for the latest version.
+func findLatestVersionAllTags(r *git.Repository, config *Config) (*semver.Version, *object.Commit, error) {
 	tagIter, err := r.Tags()
 	if err != nil {
 		return nil, nil, err
@@ -22,8 +91,86 @@ func FindLatestVersion(r *git.Repository, config *Config) (*semver.Version, *obj
 
 	var latestVersion *semver.Version
 	var latestTag *plumbing.Reference
+	isGreaterThan := createIsGreaterThanFunc(config)
 
-	isGreaterThan := func(v1, v2 *semver.Version) bool {
+	err = tagIter.ForEach(func(ref *plumbing.Reference) error {
+		v, err := versionFromTag(ref, config)
+		if err != nil {
+			return nil // Ignore non-semver tags
+		}
+
+		if latestVersion == nil || isGreaterThan(v, latestVersion) {
+			latestVersion = v
+			latestTag = ref
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if latestTag == nil {
+		return nil, nil, nil
+	}
+
+	latestTagCommit, err := getCommitFromTag(r, latestTag)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return latestVersion, latestTagCommit, nil
+}
+
+// buildTagMap creates a map from commit hash to tag references.
+func buildTagMap(r *git.Repository) (map[plumbing.Hash][]*plumbing.Reference, error) {
+	tagsMap := make(map[plumbing.Hash][]*plumbing.Reference)
+	tagIter, err := r.Tags()
+	if err != nil {
+		return nil, err
+	}
+	err = tagIter.ForEach(func(ref *plumbing.Reference) error {
+		commit, err := getCommitFromTag(r, ref)
+		if err != nil {
+			// Cannot resolve tag, maybe log it and skip
+			return nil
+		}
+		tagsMap[commit.Hash] = append(tagsMap[commit.Hash], ref)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return tagsMap, nil
+}
+
+// getCommitFromTag resolves a tag reference to its commit, handling both lightweight and annotated tags.
+func getCommitFromTag(r *git.Repository, ref *plumbing.Reference) (*object.Commit, error) {
+	// CommitObject will resolve annotated tags to their underlying commit.
+	// For lightweight tags, the hash already points to a commit.
+	commit, err := r.CommitObject(ref.Hash())
+	if err != nil {
+		// If the tag points to something other than a commit (e.g., a tree or blob),
+		// CommitObject will fail. We treat this as an unresolvable tag for versioning.
+		return nil, fmt.Errorf("failed to resolve tag %s to commit: %w", ref.Name(), err)
+	}
+	return commit, nil
+}
+
+// versionFromTag extracts a semantic version from a tag reference.
+func versionFromTag(ref *plumbing.Reference, config *Config) (*semver.Version, error) {
+	tagName := ref.Name().Short()
+	prefixRegex, err := regexp.Compile(config.TagPrefix)
+	if err != nil {
+		return nil, err
+	}
+	cleanedTagName := prefixRegex.ReplaceAllString(tagName, "")
+	return semver.NewVersion(cleanedTagName)
+}
+
+// createIsGreaterThanFunc returns a function that compares two semantic versions,
+// considering the tag-pre-release-weight configuration.
+func createIsGreaterThanFunc(config *Config) func(v1, v2 *semver.Version) bool {
+	return func(v1, v2 *semver.Version) bool {
 		// If major, minor, or patch are different, standard comparison is enough.
 		if v1.Major() != v2.Major() || v1.Minor() != v2.Minor() || v1.Patch() != v2.Patch() {
 			return v1.GreaterThan(v2)
@@ -61,49 +208,6 @@ func FindLatestVersion(r *git.Repository, config *Config) (*semver.Version, *obj
 		// Fallback to standard semver comparison
 		return v1.GreaterThan(v2)
 	}
-
-	err = tagIter.ForEach(func(ref *plumbing.Reference) error {
-		tagName := ref.Name().Short()
-		prefixRegex, err := regexp.Compile(config.TagPrefix)
-		if err != nil {
-			// Handle invalid regex in config, maybe log it
-			return nil
-		}
-		cleanedTagName := prefixRegex.ReplaceAllString(tagName, "")
-		v, err := semver.NewVersion(cleanedTagName)
-		if err != nil {
-			return nil // Ignore non-semver tags
-		}
-
-		if latestVersion == nil || isGreaterThan(v, latestVersion) {
-			latestVersion = v
-			latestTag = ref
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if latestTag == nil {
-		return nil, nil, nil
-	}
-
-	// Get the commit for the latest tag
-	latestTagCommit, err := r.CommitObject(latestTag.Hash())
-	if err != nil {
-		// This can happen with lightweight tags, try to resolve it
-		tagObj, err := r.TagObject(latestTag.Hash())
-		if err != nil {
-			return nil, nil, err
-		}
-		latestTagCommit, err = r.CommitObject(tagObj.Target)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return latestVersion, latestTagCommit, nil
 }
 
 type semverBump int
