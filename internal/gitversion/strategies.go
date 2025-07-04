@@ -13,14 +13,16 @@ import (
 
 // VersionContext holds all the information needed for versioning strategies.
 type VersionContext struct {
-	Repository          *git.Repository
-	Config              *Config
-	CurrentBranchName   string
-	BaseVersion         *semver.Version
-	BaseVersionCommit   *object.Commit
-	NextVersion         *semver.Version
-	Bump                semverBump
-	CommitsSinceLastTag int
+	Repository            *git.Repository
+	Config                *Config
+	CurrentBranchName     string
+	BaseVersion           *semver.Version
+	BaseVersionCommit     *object.Commit
+	NextVersion           *semver.Version
+	Bump                  semverBump
+	CommitsSinceLastTag   int
+	FormattedCommitDates  []string // commit dates formatted per config.CommitDateFormat
+	MergeCommitIndices    []int    // indices in commits slice that match merge-message-formats
 }
 
 type semverBump int
@@ -84,13 +86,6 @@ func (s *FindLatestTagStrategy) Execute(ctx *VersionContext) (bool, error) {
 
 // getBumpFromMessage analyzes a commit message and returns the bump type.
 func getBumpFromMessage(config *Config, message string) semverBump {
-	// Check for no-bump message first
-	if config.NoBumpMessage != "" {
-		if matched, _ := regexp.MatchString(config.NoBumpMessage, message); matched {
-			return noBump
-		}
-	}
-
 	// Conventional commits
 	commitLines := strings.Split(message, "\n")
 	header := commitLines[0]
@@ -134,6 +129,33 @@ func getBumpFromMessage(config *Config, message string) semverBump {
 type IncrementFromCommitsStrategy struct{}
 
 func (s *IncrementFromCommitsStrategy) Execute(ctx *VersionContext) (bool, error) {
+	// Determine commit date format
+	commitDateFormat := ctx.Config.CommitDateFormat
+	if commitDateFormat == "" {
+		commitDateFormat = "2006-01-02T15:04:05Z07:00" // ISO8601 default
+	}
+	// Prepare merge commit regexes
+	var mergeRegexes []*regexp.Regexp
+	if len(ctx.Config.MergeMessageFormats) > 0 {
+		for _, pat := range ctx.Config.MergeMessageFormats {
+			re, err := regexp.Compile(pat)
+			if err == nil {
+				mergeRegexes = append(mergeRegexes, re)
+			}
+		}
+	} else {
+		// Default patterns: GitHub/GitLab/Bitbucket
+		defaultPatterns := []string{
+			`^Merge pull request #`,
+			`^Merge branch '`,
+			`^Merged in `,
+		}
+		for _, pat := range defaultPatterns {
+			re, _ := regexp.Compile(pat)
+			mergeRegexes = append(mergeRegexes, re)
+		}
+	}
+
 	if ctx.BaseVersion == nil || ctx.NextVersion != nil {
 		return false, nil
 	}
@@ -150,18 +172,60 @@ func (s *IncrementFromCommitsStrategy) Execute(ctx *VersionContext) (bool, error
 	defer commitIter.Close()
 
 	var commits []*object.Commit
+	ctx.FormattedCommitDates = nil
+	ctx.MergeCommitIndices = nil
 	err = commitIter.ForEach(func(c *object.Commit) error {
 		if ctx.BaseVersionCommit != nil && c.Hash == ctx.BaseVersionCommit.Hash {
 			return storer.ErrStop
 		}
+		// Ignore commit if SHA is in config.Ignore
+		ignored := false
+		for _, sha := range ctx.Config.Ignore {
+			if c.Hash.String() == sha {
+				ignored = true
+				break
+			}
+		}
+		if ignored {
+			return nil
+		}
 		commits = append(commits, c)
+		// Format and store commit date
+		ctx.FormattedCommitDates = append(ctx.FormattedCommitDates, c.Committer.When.Format(commitDateFormat))
+		// Check for merge commit
+		for _, re := range mergeRegexes {
+			if re.MatchString(c.Message) {
+				ctx.MergeCommitIndices = append(ctx.MergeCommitIndices, len(commits)-1)
+				break
+			}
+		}
 		return nil
 	})
 	if err != nil && err != storer.ErrStop {
 		return false, err
 	}
+	// Reverse commits so that commits[0] is the most recent
+	for i, j := 0, len(commits)-1; i < j; i, j = i+1, j-1 {
+		commits[i], commits[j] = commits[j], commits[i]
+	}
 	ctx.CommitsSinceLastTag = len(commits)
 
+	// If the most recent commit matches no-bump-message, do not bump at all
+	if len(commits) > 0 {
+		if strings.Contains(commits[0].Message, "+semver: none") || strings.Contains(commits[0].Message, "+semver: skip") {
+			ctx.Bump = noBump
+			ctx.NextVersion = ctx.BaseVersion
+			return true, nil // No bump if no-bump-message found
+		}
+	}
+	if len(commits) > 0 && ctx.Config.NoBumpMessage != "" {
+		matched, _ := regexp.MatchString(ctx.Config.NoBumpMessage, commits[0].Message)
+		if matched {
+			ctx.Bump = noBump
+			ctx.NextVersion = ctx.BaseVersion
+			return true, nil // No bump if no-bump-message found
+		}
+	}
 	var highestBump = noBump
 	for _, commit := range commits {
 		bump := getBumpFromMessage(ctx.Config, commit.Message)
@@ -169,13 +233,51 @@ func (s *IncrementFromCommitsStrategy) Execute(ctx *VersionContext) (bool, error
 			highestBump = bump
 		}
 	}
-
-	branchConfig := ctx.Config.GetBranchConfig(ctx.CurrentBranchName)
+	branchConfig := ctx.Config.GetBranchConfig(ctx.CurrentBranchName);
+	// Handle semver-from-branch mode (for release branches)
+	if branchConfig != nil && branchConfig.Mode == "semver-from-branch" {
+		// Try to parse version from branch name (e.g., release/1.2.3)
+		re := regexp.MustCompile(`\d+\.\d+\.\d+`)
+		match := re.FindString(ctx.CurrentBranchName)
+		if match != "" {
+			v, err := semver.NewVersion(match)
+			if err == nil {
+				// Add pre-release tag if specified
+				ver := *v
+				if branchConfig.Tag != "" {
+					ver, _ = ver.SetPrerelease(branchConfig.Tag + ".1")
+				}
+				ctx.NextVersion = &ver
+				ctx.Bump = noBump
+				return true, nil
+			}
+		}
+	}
+	// Use increment setting if no bump detected
 	if highestBump == noBump && len(commits) > 0 && (branchConfig == nil || !branchConfig.PreventIncrement) {
-		highestBump = patchBump
+		// Only apply increment setting for the *first* commit after the tag
+		increment := ""
+		if branchConfig != nil && branchConfig.Increment != "" {
+			increment = strings.ToLower(branchConfig.Increment)
+		} else if ctx.Config.Increment != "" {
+			increment = strings.ToLower(ctx.Config.Increment)
+		}
+		if increment != "" {
+			switch increment {
+			case "major":
+				highestBump = majorBump
+			case "minor":
+				highestBump = minorBump
+			case "patch":
+				highestBump = patchBump
+			default:
+				highestBump = patchBump // Default to patch if not specified
+			}
+		} else {
+			highestBump = patchBump
+		}
 	}
 	ctx.Bump = highestBump
-
 	if highestBump != noBump {
 		nextVersion := *ctx.BaseVersion
 		switch highestBump {
@@ -189,7 +291,6 @@ func (s *IncrementFromCommitsStrategy) Execute(ctx *VersionContext) (bool, error
 		ctx.NextVersion = &nextVersion
 		return true, nil // Strategy produced a version
 	}
-
 	return false, nil // No increment found
 }
 

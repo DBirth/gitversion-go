@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"regexp"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-git/go-git/v5"
@@ -91,7 +92,18 @@ func findVersionOnBranches(r *git.Repository, config *Config, branchNames []stri
 		commitTags := make(map[plumbing.Hash][]string)
 		for _, tag := range tags {
 			// TODO: This is inefficient. We should get the commit from the tag ref instead.
-			commitTags[tag.Hash()] = append(commitTags[tag.Hash()], tag.Name().Short())
+			commitTags[tag.Hash()] = append(commitTags[tag.Hash()], tag.Name().Short()) // tag name as-is
+		// Also store with prefix stripped for lookup
+		prefix := config.TagPrefix
+		if prefix == "" {
+			prefix = "([vV])?"
+		}
+		re, err := regexp.Compile("^" + prefix)
+		if err == nil && re.MatchString(tag.Name().Short()) {
+			stripped := re.ReplaceAllString(tag.Name().Short(), "")
+			commitTags[tag.Hash()] = append(commitTags[tag.Hash()], stripped)
+		}
+
 		}
 
 		err = commitIter.ForEach(func(c *object.Commit) error {
@@ -134,7 +146,20 @@ func findLatestVersionAllTags(r *git.Repository, config *Config) (*semver.Versio
 	tagCommitMap := make(map[*semver.Version]*object.Commit)
 
 	err = tagRefs.ForEach(func(ref *plumbing.Reference) error {
-		v, err := semver.NewVersion(ref.Name().Short())
+		tagName := ref.Name().Short()
+		prefix := config.TagPrefix
+		if prefix == "" {
+			prefix = "([vV])?"
+		}
+		re, err := regexp.Compile("^" + prefix)
+		if err != nil {
+			return nil // skip invalid prefix
+		}
+		if !re.MatchString(tagName) {
+			return nil // skip tags that don't match prefix
+		}
+		stripped := re.ReplaceAllString(tagName, "")
+		v, err := semver.NewVersion(stripped)
 		if err == nil {
 			commit, err := getCommitFromTag(r, ref)
 			if err != nil {
