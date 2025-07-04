@@ -2,9 +2,7 @@ name: Security & License Compliance
 
 on:
   schedule:
-    - cron: '0 3 * * *' # every day at 3am UTC
-  pull_request:
-    branches: [ main ]
+    - cron: '0 3 * * 6' # every Saturday at 3am UTC
 
 jobs:
   security-licenses:
