@@ -8,14 +8,15 @@ all: build
 
 build:
 	@echo "Building $(BINARY_NAME)..."
-	@$(GO_CMD) build -o $(BINARY_NAME) .
+	@$(GO_CMD) build -o $(BINARY_NAME) ./cmd/gitversion-go
 
 build-linux:
 	@echo "Building statically linked binary for Linux..."
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO_CMD) build -o $(BINARY_NAME) .
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO_CMD) build -o $(BINARY_NAME) ./cmd/gitversion-go
 
 test:
 	@echo "Running tests..."
+	@$(GO_CMD) test ./...
 	@/bin/zsh -c 'source ~/.zshrc && $(GO_CMD) test ./...'
 
 clean:
