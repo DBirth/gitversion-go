@@ -18,6 +18,9 @@ jobs:
           # Use Go 1.22 for go-licenses compatibility (see https://github.com/google/go-licenses/issues/128)
           go-version: '1.22'
 
+      - name: Build
+        run: go build -v ./...
+
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
@@ -25,6 +28,20 @@ jobs:
 
       - name: Lint (security, vulnerabilities)
         run: golangci-lint run --timeout 5m
+
+      - name: License compliance (Permissive OSI licenses)
+        run: |
+          go install github.com/google/go-licenses@v1.6.0
+          go-licenses check ./... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC
+
+      - name: Check for findings and create issue if needed
+        run: |
+          if grep -q 'forbidden license' <(go-licenses check ./... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC); then
+            gh issue create --title "License Compliance Issue" --body "Forbidden license detected in dependencies." --assignee ${{ github.repository_owner }}
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   renovate:
     runs-on: ubuntu-latest
     steps:
