@@ -31,10 +31,10 @@ jobs:
       - name: Lint (style, vulnerabilities, security)
         run: golangci-lint run --timeout 5m
 
-      - name: License compliance (Apache/MIT only)
+      - name: License compliance (Permissive OSI licenses)
         run: |
           go install github.com/google/go-licenses@latest
-          go-licenses check ./... --allowed_licenses=apache,mit
+          go-licenses check ./... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC
 
   version-bump:
     needs: build-test-lint

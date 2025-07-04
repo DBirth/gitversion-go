@@ -1,9 +1,11 @@
-package main
+package tests
 
 import (
-	"gitversion-go/internal/fs"
 	"os"
 	"testing"
+
+	"gitversion-go/internal/app"
+	"gitversion-go/internal/fs"
 
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +23,7 @@ func TestInitCommand_GitFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	fsys := fs.NewOsFs()
-	err = runInit(fsys, "GitFlow")
+	err = app.RunInit(fsys, "GitFlow")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile("GitVersion.yml")
@@ -44,7 +46,7 @@ func TestInitCommand_GitHubFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	fsys := fs.NewOsFs()
-	err = runInit(fsys, "GitHubFlow")
+	err = app.RunInit(fsys, "GitHubFlow")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile("GitVersion.yml")
@@ -67,7 +69,7 @@ func TestInitCommand_UnknownWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	fsys := fs.NewOsFs()
-	err = runInit(fsys, "UnknownFlow")
+	err = app.RunInit(fsys, "UnknownFlow")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown workflow")
 }
