@@ -13,16 +13,23 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
+var workflow string
+
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Creates a default GitVersion.yml file",
 	RunE: func(_ *cobra.Command, _ []string) error {
 		fs := fs.NewOsFs()
-		return runInit(fs)
+		return runInit(fs, workflow)
 	},
 }
 
-func runInit(fs fs.Filesystem) error {
+func init() {
+	initCmd.Flags().StringVar(&workflow, "workflow", "GitFlow", "Workflow template to use: GitFlow or GitHubFlow")
+	rootCmd.AddCommand(initCmd)
+}
+
+func runInit(fs fs.Filesystem, workflow string) error {
 	const configFileName = "GitVersion.yml"
 
 	exists, err := fs.Exists(configFileName)
@@ -35,11 +42,16 @@ func runInit(fs fs.Filesystem) error {
 		return nil
 	}
 
-	err = fs.WriteFile(configFileName, []byte(gitversion.DefaultConfig), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write default config file: %w", err)
+	template := gitversion.GetWorkflowTemplate(workflow)
+	if template == "" {
+		return fmt.Errorf("unknown workflow: %s", workflow)
 	}
 
-	fmt.Printf("Successfully created a '%s' file.\n", configFileName)
+	err = fs.WriteFile(configFileName, []byte(template), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	fmt.Printf("Successfully created a '%s' file for workflow '%s'.\n", configFileName, workflow)
 	return nil
 }

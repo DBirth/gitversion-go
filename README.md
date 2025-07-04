@@ -25,11 +25,15 @@ The tool has two main commands: `init` and `calculate`.
 
 ### `init`
 
-This command creates a default `GitVersion.yml` configuration file in the current directory.
+This command creates a default `GitVersion.yml` configuration file in the current directory. You can specify a workflow template:
 
 ```sh
-gitversion-go init
+gitversion-go init --workflow GitFlow      # Classic GitFlow branches
+
+gitversion-go init --workflow GitHubFlow   # Simple GitHubFlow (main + feature/*)
 ```
+
+If no workflow is specified, `GitFlow` is used by default.
 
 ### `calculate`
 
@@ -53,7 +57,9 @@ gitversion-go calculate
 
 ## Configuration
 
-Versioning behavior is controlled by a `GitVersion.yml` file. The core of the configuration is the `strategies` block, which defines a sequence of versioning strategies to be executed.
+Versioning behavior is controlled by a `GitVersion.yml` file. You can generate a ready-made config for your workflow using `gitversion-go init --workflow <GitFlow|GitHubFlow>`.
+
+The core of the configuration is the `strategies` block, which defines a sequence of versioning strategies to be executed.
 
 GitVersion will try each strategy in order until one successfully determines the version.
 
@@ -65,34 +71,60 @@ You can define a list of strategies globally or per-branch. The following strate
 -   **`increment-from-commits`**: This strategy inspects commit messages since the last tag. It uses **Conventional Commits** (`feat:`, `fix:`, `feat!:`, `BREAKING CHANGE:`) and configurable regex patterns to determine the version bump (`major`, `minor`, or `patch`).
 -   **`configured-next-version`**: This strategy acts as a fallback. If no tags are found, it uses the version specified in the `next-version` field of your configuration.
 
-### Example Configuration
+### Example Workflow Templates
 
-Here is an example `GitVersion.yml` that demonstrates the new strategy-based system:
+You can generate a starter config for either workflow using the CLI:
 
+#### GitFlow
+```sh
+gitversion-go init --workflow GitFlow
+```
+Produces:
 ```yaml
-next-version: 0.1.0
-strategies:
-  - find-latest-tag
-  - increment-from-commits
-  - configured-next-version
-
-major-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(breaking|major))"
-minor-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(feature|minor))"
-patch-version-bump-message: "^(\\s|\\S)*?(\\+semver:\\s?(fix|patch))"
-
 branches:
-  main:
-    tag: ""
-  develop:
-    tag: alpha
-    prevent-increment: false # On develop, we want patch increments for each commit
-  feature:
+  ^master$:
+    mode: ContinuousDeployment
+    tag: ''
+    increment: Patch
+    is-release-branch: true
+  ^develop$:
+    mode: ContinuousDeployment
+    tag: beta
+    increment: Minor
+  ^release/.*$:
+    mode: ContinuousDeployment
+    tag: rc
+    increment: Patch
+    is-release-branch: true
+  ^hotfix/.*$:
+    mode: ContinuousDeployment
+    tag: hotfix
+    increment: Patch
+    is-release-branch: true
+  ^feature/.*$:
+    mode: ContinuousDeployment
     tag: use-branch-name
-    prevent-increment: true # On feature branches, we don't want patch increments
-  release:
-    tag: beta
-  hotfix:
-    tag: beta
+    increment: Minor
+    source-branches: [develop]
+```
+
+#### GitHubFlow
+```sh
+gitversion-go init --workflow GitHubFlow
+```
+Produces:
+```yaml
+branches:
+  ^main$:
+    mode: ContinuousDeployment
+    tag: ''
+    increment: Patch
+    is-release-branch: true
+  ^feature/.*$:
+    mode: ContinuousDeployment
+    tag: use-branch-name
+    increment: Minor
+    source-branches: [main]
 ```
 
 ### Configuration Options
