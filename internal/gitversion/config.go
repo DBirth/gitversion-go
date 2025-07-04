@@ -14,6 +14,8 @@ type Config struct {
 	Increment               string                  `yaml:"increment,omitempty"`
 	TagPreReleaseWeight     map[string]int          `yaml:"tag-pre-release-weight,omitempty"`
 	Strategies              []string                `yaml:"strategies,omitempty"`
+	CommitDateFormat        string                  `yaml:"commit-date-format,omitempty"`
+	MergeMessageFormats     []string                `yaml:"merge-message-formats,omitempty"`
 	Branches                map[string]BranchConfig `yaml:"branches"`
 }
 
