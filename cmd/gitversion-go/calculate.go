@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"gitversion-go/internal/gitversion"
 	"gitversion-go/internal/fs"
+	"gitversion-go/internal/gitversion"
 )
 
 var outputFormat string

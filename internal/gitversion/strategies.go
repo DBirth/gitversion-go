@@ -13,16 +13,16 @@ import (
 
 // VersionContext holds all the information needed for versioning strategies.
 type VersionContext struct {
-	Repository            *git.Repository
-	Config                *Config
-	CurrentBranchName     string
-	BaseVersion           *semver.Version
-	BaseVersionCommit     *object.Commit
-	NextVersion           *semver.Version
-	Bump                  semverBump
-	CommitsSinceLastTag   int
-	FormattedCommitDates  []string // commit dates formatted per config.CommitDateFormat
-	MergeCommitIndices    []int    // indices in commits slice that match merge-message-formats
+	Repository           *git.Repository
+	Config               *Config
+	CurrentBranchName    string
+	BaseVersion          *semver.Version
+	BaseVersionCommit    *object.Commit
+	NextVersion          *semver.Version
+	Bump                 semverBump
+	CommitsSinceLastTag  int
+	FormattedCommitDates []string // commit dates formatted per config.CommitDateFormat
+	MergeCommitIndices   []int    // indices in commits slice that match merge-message-formats
 }
 
 type semverBump int
@@ -66,6 +66,7 @@ func (e *StrategyExecutor) ExecuteStrategies(ctx *VersionContext) error {
 // FindLatestTagStrategy finds the latest semantic version tag in the repository.
 type FindLatestTagStrategy struct{}
 
+// Execute runs the FindLatestTagStrategy to find the latest tag version.
 func (s *FindLatestTagStrategy) Execute(ctx *VersionContext) (bool, error) {
 	if ctx.BaseVersion != nil {
 		return false, nil
@@ -128,6 +129,7 @@ func getBumpFromMessage(config *Config, message string) semverBump {
 // IncrementFromCommitsStrategy increments the base version based on commit messages.
 type IncrementFromCommitsStrategy struct{}
 
+// Execute runs the IncrementFromCommitsStrategy to determine the next version from commit messages.
 func (s *IncrementFromCommitsStrategy) Execute(ctx *VersionContext) (bool, error) {
 	// Determine commit date format
 	commitDateFormat := ctx.Config.CommitDateFormat
@@ -233,7 +235,7 @@ func (s *IncrementFromCommitsStrategy) Execute(ctx *VersionContext) (bool, error
 			highestBump = bump
 		}
 	}
-	branchConfig := ctx.Config.GetBranchConfig(ctx.CurrentBranchName);
+	branchConfig := ctx.Config.GetBranchConfig(ctx.CurrentBranchName)
 	// Handle semver-from-branch mode (for release branches)
 	if branchConfig != nil && branchConfig.Mode == "semver-from-branch" {
 		// Try to parse version from branch name (e.g., release/1.2.3)
@@ -297,6 +299,7 @@ func (s *IncrementFromCommitsStrategy) Execute(ctx *VersionContext) (bool, error
 // ConfiguredNextVersionStrategy provides a version based on the 'next-version' configuration.
 type ConfiguredNextVersionStrategy struct{}
 
+// Execute runs the ConfiguredNextVersionStrategy to use a configured next version if present.
 func (s *ConfiguredNextVersionStrategy) Execute(ctx *VersionContext) (bool, error) {
 	if ctx.BaseVersion != nil || ctx.NextVersion != nil {
 		return false, nil
@@ -316,11 +319,12 @@ func (s *ConfiguredNextVersionStrategy) Execute(ctx *VersionContext) (bool, erro
 }
 
 var strategyFactories = map[string]func() VersioningStrategy{
-	"find-latest-tag":          func() VersioningStrategy { return &FindLatestTagStrategy{} },
-	"increment-from-commits":   func() VersioningStrategy { return &IncrementFromCommitsStrategy{} },
-	"configured-next-version":  func() VersioningStrategy { return &ConfiguredNextVersionStrategy{} },
+	"find-latest-tag":         func() VersioningStrategy { return &FindLatestTagStrategy{} },
+	"increment-from-commits":  func() VersioningStrategy { return &IncrementFromCommitsStrategy{} },
+	"configured-next-version": func() VersioningStrategy { return &ConfiguredNextVersionStrategy{} },
 }
 
+// BuildStrategies constructs the list of versioning strategies for a given branch and config.
 func BuildStrategies(config *Config, branchName string) ([]VersioningStrategy, error) {
 	branchConfig := config.GetBranchConfig(branchName)
 

@@ -16,11 +16,11 @@ import (
 
 func TestRunCalculate(t *testing.T) {
 	testCases := []struct {
-		name               string
-		config             string
-		setupRepo          func(t *testing.T, r *git.Repository, worktree *git.Worktree) 
-		expectedOutput     string
-		expectedErr        string
+		name           string
+		config         string
+		setupRepo      func(t *testing.T, r *git.Repository, worktree *git.Worktree)
+		expectedOutput string
+		expectedErr    string
 	}{
 		{
 			name: "Simple major bump from commit message",
