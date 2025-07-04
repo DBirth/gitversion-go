@@ -6,7 +6,7 @@ This document outlines the feature parity between this Go implementation (`gitve
 
 | Feature | Original GitVersion | gitversion-go | Notes |
 | :--- | :---: | :---: | :--- |
-| `workflow` | Supported | Not Supported | `gitversion-go` does not use workflow templates like GitFlow or GitHubFlow. Configuration is done from scratch. |
+| `workflow` | Supported | Supported | `gitversion-go` supports workflow templates for GitFlow and GitHubFlow via `gitversion-go init --workflow <name>`. Strategies are configurable per branch or globally. |
 | `next-version` | Supported | Supported |  |
 | `assembly-versioning-scheme` | Supported | Not Supported | .NET-specific feature. |
 | `assembly-file-versioning-scheme` | Supported | Not Supported | .NET-specific feature. |
