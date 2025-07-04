@@ -1,15 +1,17 @@
-next-version: 0.1.0
+# GitHubFlow workflow configuration for GitVersion
+# commit-date-format: "2006-01-02T15:04:05Z07:00" # optional, Go time format string
+# merge-message-formats:
+#   - "^Merge pull request #"
+#   - "^Merge branch '"
+#   - "^Merged in "
 branches:
-  main:
-    tag: ""
-  develop:
+  ^main$:
     mode: ContinuousDeployment
-    tag: alpha
-  release:
-    mode: semver-from-branch
-    tag: beta
-  feature:
+    tag: ''
+    increment: Patch
+    is-release-branch: true
+  ^feature/.*$:
+    mode: ContinuousDeployment
     tag: use-branch-name
-  hotfix:
-    mode: semver-from-branch
-    tag: beta
+    increment: Minor
+    source-branches: [main]

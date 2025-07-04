@@ -1,0 +1,47 @@
+# Go build artifacts
+/bin/
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output binaries
+/gitversion-go
+/gitversion-go-*
+*.bin
+*.o
+
+# Dependency directories
+vendor/
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Test cache and coverage
+*.coverprofile
+*.testresult
+*.log
+*.tmp
+
+# GoLand
+*.iml
+
+# VSCode settings
+.vscode/
+
+# Misc
+*.local
+.env
+.env.*
