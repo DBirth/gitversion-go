@@ -54,7 +54,7 @@ jobs:
       - name: Calculate next version
         run: |
           go build -o gitversion-go ./cmd/gitversion-go
-          ./gitversion-go calculate > version.json
+          ./gitversion-go calculate --output json > version.json
           cat version.json
 
       - name: Tag with calculated version (if needed)
