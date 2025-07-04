@@ -1,4 +1,5 @@
-package main
+// Package tests contains integration and unit tests for the GitVersion CLI and core logic.
+package tests
 
 import (
 	"bytes"
@@ -12,9 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitversion-go/internal/fs"
+
+	"gitversion-go/internal/app"
 )
 
-func TestRunCalculate(t *testing.T) {
+func TestRunCalculate_Unit(t *testing.T) {
 	testCases := []struct {
 		name           string
 		config         string
@@ -31,9 +34,9 @@ strategies:
   - increment-from-commits
 `,
 			setupRepo: func(t *testing.T, r *git.Repository, worktree *git.Worktree) {
-				commit(t, worktree, "feat: Initial commit")
-				tag(t, r, "v1.0.0")
-				commit(t, worktree, "feat!: Breaking change")
+				commitUnit(t, worktree, "feat: Initial commit")
+				tagUnit(t, r, "v1.0.0")
+				commitUnit(t, worktree, "feat!: Breaking change")
 			},
 			expectedOutput: "Calculated next version: 2.0.0\n",
 		},
@@ -41,29 +44,24 @@ strategies:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setup
-			fs := fs.NewOsFs()
+			fsys := fs.NewOsFs()
 			tempDir := t.TempDir()
 			r, err := git.PlainInit(tempDir, false)
 			require.NoError(t, err)
 			worktree, err := r.Worktree()
 			require.NoError(t, err)
 
-			// Write config file
 			configPath := filepath.Join(tempDir, "GitVersion.yml")
-			err = fs.WriteFile(configPath, []byte(tc.config), 0644)
+			err = fsys.WriteFile(configPath, []byte(tc.config), 0644)
 			require.NoError(t, err)
 
-			// Setup repo state
 			if tc.setupRepo != nil {
 				tc.setupRepo(t, r, worktree)
 			}
 
-			// Execute
 			var out bytes.Buffer
-			err = runCalculate(fs, &out, tempDir, "default")
+			err = app.RunCalculate(fsys, &out, tempDir, "default")
 
-			// Assert
 			if tc.expectedErr != "" {
 				assert.EqualError(t, err, tc.expectedErr)
 			} else {
@@ -74,7 +72,7 @@ strategies:
 	}
 }
 
-func commit(t *testing.T, w *git.Worktree, msg string) {
+func commitUnit(t *testing.T, w *git.Worktree, msg string) {
 	t.Helper()
 	filename := "dummy_file.txt"
 	file, err := w.Filesystem.Create(filename)
@@ -97,12 +95,17 @@ func commit(t *testing.T, w *git.Worktree, msg string) {
 	require.NoError(t, err)
 }
 
-func tag(t *testing.T, r *git.Repository, tagName string) {
+func tagUnit(t *testing.T, r *git.Repository, tagName string) {
 	t.Helper()
 	head, err := r.Head()
 	require.NoError(t, err)
 	_, err = r.CreateTag(tagName, head.Hash(), &git.CreateTagOptions{
 		Message: tagName,
+		Tagger: &object.Signature{
+			Name:  "TestTagger",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
 	})
 	require.NoError(t, err)
 }
