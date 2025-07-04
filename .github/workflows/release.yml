@@ -1,5 +1,9 @@
 name: Release
 
+permissions:
+  contents: write
+  actions: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -29,28 +33,14 @@ jobs:
         run: |
           GOOS=linux GOARCH=arm64 go build -o gitversion-go-linux-arm64 ./cmd/gitversion-go
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      - name: Create or update release
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ github.event.inputs.tag }}
+          tag: ${{ github.event.inputs.tag }}
           name: Release ${{ github.event.inputs.tag }}
+          artifacts: "gitversion-go-linux-amd64,gitversion-go-linux-arm64"
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload linux/amd64 binary
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag }}
-          files: gitversion-go-linux-amd64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload linux/arm64 binary
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag }}
-          files: gitversion-go-linux-arm64
+          allowUpdates: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
