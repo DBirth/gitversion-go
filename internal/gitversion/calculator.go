@@ -4,8 +4,8 @@ package gitversion
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"regexp"
+	"sort"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-git/go-git/v5"
@@ -93,16 +93,16 @@ func findVersionOnBranches(r *git.Repository, config *Config, branchNames []stri
 		for _, tag := range tags {
 			// TODO: This is inefficient. We should get the commit from the tag ref instead.
 			commitTags[tag.Hash()] = append(commitTags[tag.Hash()], tag.Name().Short()) // tag name as-is
-		// Also store with prefix stripped for lookup
-		prefix := config.TagPrefix
-		if prefix == "" {
-			prefix = "([vV])?"
-		}
-		re, err := regexp.Compile("^" + prefix)
-		if err == nil && re.MatchString(tag.Name().Short()) {
-			stripped := re.ReplaceAllString(tag.Name().Short(), "")
-			commitTags[tag.Hash()] = append(commitTags[tag.Hash()], stripped)
-		}
+			// Also store with prefix stripped for lookup
+			prefix := config.TagPrefix
+			if prefix == "" {
+				prefix = "([vV])?"
+			}
+			re, err := regexp.Compile("^" + prefix)
+			if err == nil && re.MatchString(tag.Name().Short()) {
+				stripped := re.ReplaceAllString(tag.Name().Short(), "")
+				commitTags[tag.Hash()] = append(commitTags[tag.Hash()], stripped)
+			}
 
 		}
 
@@ -220,4 +220,3 @@ func getTags(r *git.Repository) ([]*plumbing.Reference, error) {
 	}
 	return tags, nil
 }
-

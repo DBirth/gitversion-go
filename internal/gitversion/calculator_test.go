@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,8 @@ func TestFindLatestVersionWithSourceBranches(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = file.Write([]byte("initial content"))
 	assert.NoError(t, err)
-	file.Close()
+	err = file.Close()
+	assert.NoError(t, err)
 	_, err = w.Add("README.md")
 	assert.NoError(t, err)
 
@@ -58,7 +59,8 @@ func TestFindLatestVersionWithSourceBranches(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = file.Write([]byte("\nfeature content"))
 	assert.NoError(t, err)
-	file.Close()
+	err = file.Close()
+	assert.NoError(t, err)
 	_, err = w.Add("README.md")
 	assert.NoError(t, err)
 
@@ -102,7 +104,8 @@ func TestFindLatestVersion_FallbackWhenNoTagsOnSourceBranches(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = file.Write([]byte("initial content"))
 	assert.NoError(t, err)
-	file.Close()
+	err = file.Close()
+	assert.NoError(t, err)
 	_, err = w.Add("README.md")
 	assert.NoError(t, err)
 
@@ -130,7 +133,8 @@ func TestFindLatestVersion_FallbackWhenNoTagsOnSourceBranches(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = file.Write([]byte("\nfeature content"))
 	assert.NoError(t, err)
-	file.Close()
+	err = file.Close()
+	assert.NoError(t, err)
 	_, err = w.Add("README.md")
 	assert.NoError(t, err)
 
@@ -174,7 +178,8 @@ func TestFindLatestVersion_WithMultipleSourceBranches(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = file.Write([]byte("initial content"))
 	assert.NoError(t, err)
-	file.Close()
+	err = file.Close()
+	assert.NoError(t, err)
 	_, err = w.Add("README.md")
 	assert.NoError(t, err)
 
@@ -197,7 +202,8 @@ func TestFindLatestVersion_WithMultipleSourceBranches(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = file.Write([]byte("\ndevelop content"))
 	assert.NoError(t, err)
-	file.Close()
+	err = file.Close()
+	assert.NoError(t, err)
 	_, err = w.Add("README.md")
 	assert.NoError(t, err)
 	commit2, err := w.Commit("Develop commit", &git.CommitOptions{

@@ -1,20 +1,27 @@
 package main
 
 import (
+	"gitversion-go/internal/fs"
 	"os"
 	"testing"
+
 	"github.com/stretchr/testify/require"
-	"gitversion-go/internal/fs"
 )
 
 func TestInitCommand_GitFlow(t *testing.T) {
+	var err error
 	dir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(dir)
+	defer func() {
+		if err = os.Chdir(oldWd); err != nil {
+			t.Fatalf("failed to chdir back: %v", err)
+		}
+	}()
+	err = os.Chdir(dir)
+	require.NoError(t, err)
 
 	fsys := fs.NewOsFs()
-	err := runInit(fsys, "GitFlow")
+	err = runInit(fsys, "GitFlow")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile("GitVersion.yml")
@@ -25,13 +32,19 @@ func TestInitCommand_GitFlow(t *testing.T) {
 }
 
 func TestInitCommand_GitHubFlow(t *testing.T) {
+	var err error
 	dir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(dir)
+	defer func() {
+		if err = os.Chdir(oldWd); err != nil {
+			t.Fatalf("failed to chdir back: %v", err)
+		}
+	}()
+	err = os.Chdir(dir)
+	require.NoError(t, err)
 
 	fsys := fs.NewOsFs()
-	err := runInit(fsys, "GitHubFlow")
+	err = runInit(fsys, "GitHubFlow")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile("GitVersion.yml")
@@ -42,13 +55,19 @@ func TestInitCommand_GitHubFlow(t *testing.T) {
 }
 
 func TestInitCommand_UnknownWorkflow(t *testing.T) {
+	var err error
 	dir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(dir)
+	defer func() {
+		if err = os.Chdir(oldWd); err != nil {
+			t.Fatalf("failed to chdir back: %v", err)
+		}
+	}()
+	err = os.Chdir(dir)
+	require.NoError(t, err)
 
 	fsys := fs.NewOsFs()
-	err := runInit(fsys, "UnknownFlow")
+	err = runInit(fsys, "UnknownFlow")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown workflow")
 }

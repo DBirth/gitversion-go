@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"gitversion-go/internal/gitversion"
 	"gitversion-go/internal/fs"
+	"gitversion-go/internal/gitversion"
 
 	"github.com/spf13/cobra"
 )
