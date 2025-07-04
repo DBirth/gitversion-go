@@ -1,5 +1,9 @@
 # GitVersion Go
 
+[![CI](https://github.com/dnascimento/gitversion-go/actions/workflows/ci.yml/badge.svg)](https://github.com/dnascimento/gitversion-go/actions/workflows/ci.yml)
+[![Security & License Compliance](https://github.com/dnascimento/gitversion-go/actions/workflows/security.yml/badge.svg)](https://github.com/dnascimento/gitversion-go/actions/workflows/security.yml)
+[![Release](https://github.com/dnascimento/gitversion-go/actions/workflows/release.yml/badge.svg)](https://github.com/dnascimento/gitversion-go/actions/workflows/release.yml)
+
 A command-line tool, written in Go, to help you with semantic versioning based on your Git history and Conventional Commits.
 
 ## Features
