@@ -12,6 +12,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check required directories (project layout)
+        run: |
+          test -d cmd || (echo "Missing /cmd directory" && exit 1)
+          test -d internal || (echo "Missing /internal directory" && exit 1)
+          test -d tests || (echo "Missing /tests directory" && exit 1)
+
+      - name: Check gofmt
+        run: |
+          output=$(gofmt -l .)
+          if [ -n "$output" ]; then
+            echo "The following files are not gofmt'd:"
+            echo "$output"
+            exit 1
+          fi
+
+      - name: Check goimports
+        run: |
+          go install golang.org/x/tools/cmd/goimports@latest
+          export PATH="$PATH:$(go env GOPATH)/bin:$HOME/go/bin"
+          output=$(goimports -l .)
+          if [ -n "$output" ]; then
+            echo "The following files are not goimports'd:"
+            echo "$output"
+            exit 1
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
