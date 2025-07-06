@@ -24,7 +24,27 @@ jobs:
           version: latest
 
       - name: Lint (security, vulnerabilities)
-        run: golangci-lint run --timeout 5m
+        id: lint
+        run: |
+          golangci-lint run --out-format=short > lint-results.txt
+          echo $? > lint-exit-code.txt
+          cat lint-results.txt
+
+      - name: Create GitHub issue for linter findings
+        if: always()
+        run: |
+          exit_code=$(cat lint-exit-code.txt)
+          if [ "$exit_code" -ne 0 ] && [ -s lint-results.txt ]; then
+            gh issue create \
+              --title "Security Lint Findings" \
+              --body "$(echo 'The following security or vulnerability issues were found by golangci-lint:'; echo; cat lint-results.txt)" \
+              --assignee "${{ github.repository_owner }}"
+          else
+            echo "No linter findings to report."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   renovate:
     runs-on: ubuntu-latest
     steps:
