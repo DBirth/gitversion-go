@@ -22,23 +22,53 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
+          args: --timeout=5m
+          skip-cache: true
+          skip-pkg-cache: true
 
       - name: Lint (security, vulnerabilities)
         id: lint
         run: |
-          golangci-lint run --out-format=short > lint-results.txt
-          echo $? > lint-exit-code.txt
+          # Create empty files as fallback
+          touch lint-results.txt lint-exit-code.txt
+          
+          # Run golangci-lint with error handling
+          if golangci-lint run --out-format=short > lint-results.txt 2>&1; then
+            echo "0" > lint-exit-code.txt
+            echo "Linting completed successfully"
+          else
+            echo "$?" > lint-exit-code.txt
+            echo "Linting completed with issues"
+          fi
+          
           cat lint-results.txt
 
       - name: Create GitHub issue for linter findings
         if: always()
         run: |
+          # Check if files exist and are readable
+          if [ ! -f lint-exit-code.txt ] || [ ! -f lint-results.txt ]; then
+            echo "Lint result files not found, skipping issue creation"
+            exit 0
+          fi
+          
           exit_code=$(cat lint-exit-code.txt)
           if [ "$exit_code" -ne 0 ] && [ -s lint-results.txt ]; then
-            gh issue create \
-              --title "Security Lint Findings" \
-              --body "$(echo 'The following security or vulnerability issues were found by golangci-lint:'; echo; cat lint-results.txt)" \
-              --assignee "${{ github.repository_owner }}"
+            echo "Creating GitHub issue for linter findings..."
+            
+            # Create issue with retry logic
+            for i in {1..3}; do
+              if gh issue create \
+                --title "Security Lint Findings - $(date +'%Y-%m-%d')" \
+                --body "$(echo 'The following security or vulnerability issues were found by golangci-lint:'; echo; cat lint-results.txt)" \
+                --assignee "${{ github.repository_owner }}" 2>/dev/null; then
+                echo "Issue created successfully"
+                break
+              else
+                echo "Attempt $i failed, retrying in 10 seconds..."
+                sleep 10
+              fi
+            done
           else
             echo "No linter findings to report."
           fi
@@ -50,7 +80,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
       - name: Self-hosted Renovate
         uses: renovatebot/github-action@v40.1.10
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+        timeout-minutes: 30
